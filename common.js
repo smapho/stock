@@ -36,6 +36,45 @@ function setSelectByNumericValue(selectEl, value, fallback) {
   selectEl.value = match ? match.value : fallback;
 }
 
+// --- マスタ登録時の二重登録・表記ゆれチェック ---
+function levenshteinDistance(a, b) {
+  const dp = [];
+  for (let i = 0; i <= a.length; i++) dp.push([i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function normalizeForCompare(name) {
+  return name.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+// 完全一致(大小文字/空白違いのみ)・部分一致・編集距離の近さ、いずれかで「似ている」と判定する
+function findSimilarNames(newName, existingItems, excludeId) {
+  const target = normalizeForCompare(newName);
+  return existingItems.filter((item) => {
+    if (item.id === excludeId) return false;
+    const candidate = normalizeForCompare(item.name);
+    if (!candidate || !target) return false;
+    if (candidate === target) return true;
+    if (candidate.includes(target) || target.includes(candidate)) return true;
+    const threshold = Math.max(1, Math.floor(Math.min(candidate.length, target.length) / 4));
+    return levenshteinDistance(candidate, target) <= threshold;
+  });
+}
+
+function formatDateOnly(isoString) {
+  if (!isoString) return "-";
+  return isoString.slice(0, 10);
+}
+
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

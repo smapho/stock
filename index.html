@@ -53,11 +53,12 @@
               <th>カテゴリ</th>
               <th>数量</th>
               <th>単価</th>
+              <th>購入年月日</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="products-tbody">
-            <tr class="empty-row"><td colspan="7">読み込み中…</td></tr>
+            <tr class="empty-row"><td colspan="8">読み込み中…</td></tr>
           </tbody>
         </table>
       </div>
@@ -73,6 +74,7 @@
         <table>
           <thead>
             <tr>
+              <th>取引先コード</th>
               <th>取引先名</th>
               <th>担当者</th>
               <th>電話番号</th>
@@ -81,7 +83,7 @@
             </tr>
           </thead>
           <tbody id="customers-tbody">
-            <tr class="empty-row"><td colspan="5">読み込み中…</td></tr>
+            <tr class="empty-row"><td colspan="6">読み込み中…</td></tr>
           </tbody>
         </table>
       </div>
@@ -180,6 +182,9 @@
           <input id="field-unit" type="text" value="個" />
         </label>
       </div>
+      <label>購入年月日
+        <input id="field-purchased-at" type="date" />
+      </label>
       <div class="field-row">
         <label>在庫僅少しきい値
           <input id="field-low-threshold" type="number" min="0" step="1" value="0" />
@@ -301,6 +306,9 @@
     <form id="customer-form" method="dialog">
       <h2 id="customer-dialog-title">取引先を追加</h2>
       <input type="hidden" id="customer-id" />
+      <label>取引先コード(9桁の数字)
+        <input id="customer-field-code" type="text" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="123456789" />
+      </label>
       <label>取引先名 <span class="required">*</span>
         <input id="customer-field-name" type="text" required />
       </label>

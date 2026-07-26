@@ -17,7 +17,7 @@ function renderCustomers() {
   const filtered = customers.filter((c) => !term || c.name.toLowerCase().includes(term));
 
   if (filtered.length === 0) {
-    customersTbody.innerHTML = `<tr class="empty-row"><td colspan="5">${
+    customersTbody.innerHTML = `<tr class="empty-row"><td colspan="6">${
       customers.length === 0 ? "取引先がまだありません" : "該当する取引先がありません"
     }</td></tr>`;
     return;
@@ -27,6 +27,7 @@ function renderCustomers() {
     .map(
       (c) => `
         <tr data-id="${c.id}">
+          <td>${escapeHtml(c.customer_code || "-")}</td>
           <td>${escapeHtml(c.name)}</td>
           <td>${escapeHtml(c.contact_name || "-")}</td>
           <td>${escapeHtml(c.phone || "-")}</td>
@@ -57,6 +58,7 @@ function openCustomerDialog(customer = null) {
   if (customer) {
     customerDialogTitle.textContent = "取引先を編集";
     document.getElementById("customer-id").value = customer.id;
+    document.getElementById("customer-field-code").value = customer.customer_code || "";
     document.getElementById("customer-field-name").value = customer.name;
     document.getElementById("customer-field-contact").value = customer.contact_name || "";
     document.getElementById("customer-field-phone").value = customer.phone || "";
@@ -78,7 +80,9 @@ cancelCustomerDialogBtn.addEventListener("click", () => customerDialog.close());
 customerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("customer-id").value;
+  const codeInput = document.getElementById("customer-field-code").value.trim();
   const payload = {
+    customer_code: codeInput || null,
     name: document.getElementById("customer-field-name").value.trim(),
     contact_name: document.getElementById("customer-field-contact").value.trim() || null,
     phone: document.getElementById("customer-field-phone").value.trim() || null,
@@ -91,6 +95,10 @@ customerForm.addEventListener("submit", async (e) => {
     showToast("取引先名を入力してください", true);
     return;
   }
+  if (codeInput && !/^[0-9]{9}$/.test(codeInput)) {
+    showToast("取引先コードは9桁の数字で入力してください", true);
+    return;
+  }
 
   const query = id
     ? supabaseClient.from("customers").update(payload).eq("id", id)
@@ -98,7 +106,11 @@ customerForm.addEventListener("submit", async (e) => {
 
   const { error } = await query;
   if (error) {
-    showToast(`保存エラー: ${error.message}`, true);
+    if (error.code === "23505" && error.message.includes("customers_code_unique")) {
+      showToast("この取引先コードは既に他の取引先で使用されています", true);
+    } else {
+      showToast(`保存エラー: ${error.message}`, true);
+    }
     return;
   }
   showToast("保存しました");

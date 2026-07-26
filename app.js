@@ -38,22 +38,41 @@ let brandFilterId = "";
 // --- マスタ(カテゴリ/ブランド)共通コントローラ ---
 // 「商品ダイアログ内の簡易管理モーダル」と「マスタタブの一覧」の両方を同じデータで描画する
 function createMasterController({ table, label, listElIds, addFormElIds, selectEls, onChange }) {
-  const state = { items: [] };
+  const state = { items: [], editingId: null };
   const listEls = listElIds.map((id) => document.getElementById(id));
   const deleteClass = `${table}-delete-btn`;
+  const editClass = `${table}-edit-btn`;
+  const saveClass = `${table}-save-btn`;
+  const cancelClass = `${table}-cancel-btn`;
 
   function render() {
     const html =
       state.items.length === 0
         ? `<li>${label}がまだありません</li>`
         : state.items
-            .map(
-              (item) => `
-              <li data-id="${item.id}">
-                <span>${escapeHtml(item.name)}</span>
-                <button type="button" class="btn btn-sm btn-danger ${deleteClass}" data-id="${item.id}">削除</button>
-              </li>`
-            )
+            .map((item) => {
+              if (item.id === state.editingId) {
+                return `
+                  <li data-id="${item.id}">
+                    <input type="text" class="master-edit-input" value="${escapeHtml(item.name)}" />
+                    <div class="row-actions">
+                      <button type="button" class="btn btn-sm btn-primary ${saveClass}" data-id="${item.id}">保存</button>
+                      <button type="button" class="btn btn-sm ${cancelClass}" data-id="${item.id}">キャンセル</button>
+                    </div>
+                  </li>`;
+              }
+              return `
+                  <li data-id="${item.id}">
+                    <span>
+                      ${escapeHtml(item.name)}
+                      <span class="master-item-dates">追加: ${formatDateOnly(item.created_at)} / 変更: ${formatDateOnly(item.updated_at)}</span>
+                    </span>
+                    <div class="row-actions">
+                      <button type="button" class="btn btn-sm ${editClass}" data-id="${item.id}">編集</button>
+                      <button type="button" class="btn btn-sm btn-danger ${deleteClass}" data-id="${item.id}">削除</button>
+                    </div>
+                  </li>`;
+            })
             .join("");
     listEls.forEach((el) => { el.innerHTML = html; });
 
@@ -83,6 +102,15 @@ function createMasterController({ table, label, listElIds, addFormElIds, selectE
       e.preventDefault();
       const name = input.value.trim();
       if (!name) return;
+
+      const similar = findSimilarNames(name, state.items, null);
+      if (similar.length > 0) {
+        const names = similar.map((i) => i.name).join("、");
+        if (!confirm(`似た名前の${label}がすでにあります(${names})。それでも「${name}」を登録しますか?`)) {
+          return;
+        }
+      }
+
       const { error } = await supabaseClient.from(table).insert({ name });
       if (error) {
         showToast(`追加エラー: ${error.message}`, true);
@@ -96,16 +124,51 @@ function createMasterController({ table, label, listElIds, addFormElIds, selectE
 
   listEls.forEach((el) => {
     el.addEventListener("click", async (e) => {
-      const btn = e.target.closest(`.${deleteClass}`);
-      if (!btn) return;
-      if (!confirm(`この${label}を削除しますか?(使用中の商品がある場合は削除できません)`)) return;
-      const { error } = await supabaseClient.from(table).delete().eq("id", btn.dataset.id);
-      if (error) {
-        showToast(`この${label}は商品で使用中のため削除できません`, true);
-        return;
+      const editBtn = e.target.closest(`.${editClass}`);
+      const deleteBtn = e.target.closest(`.${deleteClass}`);
+      const saveBtn = e.target.closest(`.${saveClass}`);
+      const cancelBtn = e.target.closest(`.${cancelClass}`);
+
+      if (editBtn) {
+        state.editingId = editBtn.dataset.id;
+        render();
+      } else if (cancelBtn) {
+        state.editingId = null;
+        render();
+      } else if (saveBtn) {
+        const li = saveBtn.closest("li");
+        const name = li.querySelector(".master-edit-input").value.trim();
+        if (!name) {
+          showToast("名前を入力してください", true);
+          return;
+        }
+
+        const similar = findSimilarNames(name, state.items, saveBtn.dataset.id);
+        if (similar.length > 0) {
+          const names = similar.map((i) => i.name).join("、");
+          if (!confirm(`似た名前の${label}がすでにあります(${names})。それでも「${name}」に変更しますか?`)) {
+            return;
+          }
+        }
+
+        const { error } = await supabaseClient.from(table).update({ name }).eq("id", saveBtn.dataset.id);
+        if (error) {
+          showToast(`更新エラー: ${error.message}`, true);
+          return;
+        }
+        state.editingId = null;
+        await load();
+        showToast(`${label}を更新しました`);
+      } else if (deleteBtn) {
+        if (!confirm(`この${label}を削除しますか?(使用中の商品がある場合は削除できません)`)) return;
+        const { error } = await supabaseClient.from(table).delete().eq("id", deleteBtn.dataset.id);
+        if (error) {
+          showToast(`この${label}は商品で使用中のため削除できません`, true);
+          return;
+        }
+        await load();
+        showToast(`${label}を削除しました`);
       }
-      await load();
-      showToast(`${label}を削除しました`);
     });
   });
 
@@ -192,7 +255,7 @@ function renderProducts() {
   ).length;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${
       products.length === 0 ? "商品がまだありません" : "該当する商品がありません"
     }</td></tr>`;
     return;
@@ -211,6 +274,7 @@ function renderProducts() {
           <td>${escapeHtml(categoryName)}</td>
           <td><span class="qty-badge ${isLow ? "low" : ""}">${p.quantity} ${escapeHtml(p.unit || "")}</span></td>
           <td>${formatPriceCell(p)}</td>
+          <td>${escapeHtml(p.purchased_at || "-")}</td>
           <td>
             <div class="row-actions">
               <button class="btn btn-sm move-btn" data-id="${p.id}">入出庫</button>
@@ -276,6 +340,7 @@ function openProductDialog(product = null) {
     fieldPrice.value = product.price ?? "";
     fieldPriceIncludesTax.value = String(!!product.price_includes_tax);
     setSelectByNumericValue(fieldTaxRate, product.tax_rate ?? 0.10, "0.10");
+    document.getElementById("field-purchased-at").value = product.purchased_at || "";
     document.getElementById("field-notes").value = product.notes || "";
     deleteProductBtn.hidden = false;
   } else {
@@ -306,6 +371,7 @@ productForm.addEventListener("submit", async (e) => {
     price: fieldPrice.value === "" ? null : Number(fieldPrice.value),
     price_includes_tax: fieldPriceIncludesTax.value === "true",
     tax_rate: Number(fieldTaxRate.value),
+    purchased_at: document.getElementById("field-purchased-at").value || null,
     notes: document.getElementById("field-notes").value.trim() || null,
   };
 
