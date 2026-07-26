@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>在庫管理</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>在庫管理</h1>
+    <div class="header-actions">
+      <input id="search-input" type="search" placeholder="商品名・SKUで検索" />
+      <button id="scan-barcode-btn" class="btn">📷 バーコードでスキャン</button>
+      <button id="add-product-btn" class="btn btn-primary">＋ 商品を追加</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary-bar">
+      <div class="summary-card">
+        <span class="summary-label">商品数</span>
+        <span class="summary-value" id="summary-total">0</span>
+      </div>
+      <div class="summary-card summary-card-warn">
+        <span class="summary-label">在庫僅少</span>
+        <span class="summary-value" id="summary-low">0</span>
+      </div>
+    </section>
+
+    <section class="table-wrap">
+      <table id="products-table">
+        <thead>
+          <tr>
+            <th>商品名</th>
+            <th>SKU</th>
+            <th>カテゴリ</th>
+            <th>数量</th>
+            <th>単価</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody">
+          <tr class="empty-row"><td colspan="6">読み込み中…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- 商品追加・編集モーダル -->
+  <dialog id="product-dialog">
+    <form id="product-form" method="dialog">
+      <h2 id="product-dialog-title">商品を追加</h2>
+      <input type="hidden" id="product-id" />
+
+      <label>商品名 <span class="required">*</span>
+        <input id="field-name" type="text" required />
+      </label>
+      <label>SKU
+        <input id="field-sku" type="text" />
+      </label>
+      <label>カテゴリ
+        <input id="field-category" type="text" />
+      </label>
+      <div class="field-row">
+        <label>数量
+          <input id="field-quantity" type="number" min="0" step="1" value="0" required />
+        </label>
+        <label>単位
+          <input id="field-unit" type="text" value="個" />
+        </label>
+      </div>
+      <div class="field-row">
+        <label>在庫僅少しきい値
+          <input id="field-low-threshold" type="number" min="0" step="1" value="0" />
+        </label>
+        <label>単価(円)
+          <input id="field-price" type="number" min="0" step="1" />
+        </label>
+      </div>
+      <label>メモ
+        <textarea id="field-notes" rows="2"></textarea>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" id="delete-product-btn" class="btn btn-danger" hidden>削除</button>
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-dialog-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 入出庫モーダル -->
+  <dialog id="movement-dialog">
+    <form id="movement-form" method="dialog">
+      <h2>入出庫登録</h2>
+      <input type="hidden" id="movement-product-id" />
+      <p id="movement-product-name" class="movement-product-name"></p>
+
+      <label>種別
+        <select id="movement-type">
+          <option value="in">入庫(+)</option>
+          <option value="out">出庫(-)</option>
+          <option value="adjust">在庫調整(絶対値)</option>
+        </select>
+      </label>
+      <label id="movement-qty-label">数量
+        <input id="movement-quantity" type="number" min="1" step="1" value="1" required />
+      </label>
+      <label>メモ
+        <input id="movement-note" type="text" placeholder="任意" />
+      </label>
+
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-movement-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">登録</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- バーコードスキャンモーダル -->
+  <dialog id="scan-dialog">
+    <div class="scan-body">
+      <h2>バーコードをスキャン</h2>
+      <video id="scan-video" muted playsinline></video>
+      <p id="scan-status" class="scan-status">カメラを起動しています…</p>
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-scan-btn" class="btn">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
