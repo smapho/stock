@@ -139,12 +139,51 @@
     <section class="tab-panel" data-tab-panel="reports" hidden>
       <div class="report-card">
         <h2>月末在庫表の出力</h2>
-        <p class="report-desc">指定した月の月末時点の在庫数量をCSVで出力します(入出庫履歴から算出するため、過去の月でも正確な数量を再現します)。</p>
+        <p class="report-desc">指定した月の月末時点の在庫数量を出力します(入出庫履歴から算出するため、過去の月でも正確な数量を再現します)。</p>
         <div class="report-form">
           <label>対象年月
             <input id="report-month" type="month" />
           </label>
           <button id="export-report-btn" class="btn btn-primary">CSVを出力</button>
+          <button id="export-report-pdf-btn" class="btn">PDFを出力</button>
+        </div>
+      </div>
+
+      <div class="report-card report-card-wide">
+        <h2>販売実績レポート</h2>
+        <p class="report-desc">指定期間に発行した請求書(取消済みを除く)から、商品別・取引先別の販売実績(税抜金額)を集計します。</p>
+        <div class="report-form">
+          <label>開始日
+            <input id="sales-from-date" type="date" />
+          </label>
+          <label>終了日
+            <input id="sales-to-date" type="date" />
+          </label>
+          <button id="sales-run-btn" class="btn btn-primary">集計する</button>
+        </div>
+
+        <div id="sales-results-wrap" hidden>
+          <p id="sales-summary" class="report-desc"></p>
+          <div class="report-form">
+            <button id="sales-export-csv-btn" class="btn btn-sm">CSVを出力</button>
+            <button id="sales-export-pdf-btn" class="btn btn-sm">PDFを出力</button>
+          </div>
+
+          <h3>商品別</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>商品名</th><th>数量</th><th>売上金額(税抜)</th></tr></thead>
+              <tbody id="sales-by-product-tbody"></tbody>
+            </table>
+          </div>
+
+          <h3>取引先別</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>取引先</th><th>売上金額(税抜)</th></tr></thead>
+              <tbody id="sales-by-customer-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -430,7 +469,8 @@
   </dialog>
 
   <!-- 請求書印刷プレビュー -->
-  <div id="invoice-print-view" class="invoice-print-view" hidden></div>
+  <div id="invoice-print-view" class="print-overlay" hidden></div>
+  <div id="report-print-view" class="print-overlay" hidden></div>
 
   <div id="toast" class="toast" hidden></div>
 

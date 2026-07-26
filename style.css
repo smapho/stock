@@ -460,7 +460,7 @@ dialog input, dialog select, dialog textarea {
 }
 
 /* --- 請求書印刷ビュー --- */
-.invoice-print-view {
+.print-overlay {
   position: fixed;
   inset: 0;
   background: white;
@@ -470,19 +470,19 @@ dialog input, dialog select, dialog textarea {
   overflow-y: auto;
 }
 
-.invoice-print-view .print-actions {
+.print-overlay .print-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
   margin-bottom: 20px;
 }
 
-.invoice-print-view table {
+.print-overlay table {
   width: 100%;
   border-collapse: collapse;
   margin: 16px 0;
 }
-.invoice-print-view th, .invoice-print-view td {
+.print-overlay th, .print-overlay td {
   border: 1px solid #ccc;
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -505,9 +505,9 @@ dialog input, dialog select, dialog textarea {
 }
 
 @media print {
-  body > *:not(.invoice-print-view) { display: none !important; }
-  .invoice-print-view { position: static; padding: 0; }
-  .invoice-print-view .print-actions { display: none !important; }
+  body > *:not(.print-overlay) { display: none !important; }
+  .print-overlay { position: static; padding: 0; }
+  .print-overlay .print-actions { display: none !important; }
 }
 
 /* --- レポートタブ --- */
@@ -517,8 +517,11 @@ dialog input, dialog select, dialog textarea {
   border-radius: var(--radius);
   padding: 20px;
   max-width: 480px;
+  margin-bottom: 16px;
 }
+.report-card.report-card-wide { max-width: none; }
 .report-card h2 { margin-top: 0; font-size: 1.05rem; }
+.report-card h3 { font-size: 0.92rem; margin: 16px 0 8px; }
 .report-desc {
   font-size: 0.85rem;
   color: var(--color-text-muted);
