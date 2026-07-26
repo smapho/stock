@@ -218,7 +218,10 @@ function addInvoiceItemRow(prefill = null) {
   const selectedId = prefill?.product_id || "";
   tr.innerHTML = `
     <td><select class="item-product">${productOptionsHtml(selectedId)}</select></td>
-    <td><input class="item-quantity" type="number" min="1" step="1" value="${prefill?.quantity ?? 1}" /></td>
+    <td>
+      <input class="item-quantity" type="number" min="1" step="1" value="${prefill?.quantity ?? 1}" />
+      <div class="item-stock-warn"></div>
+    </td>
     <td><input class="item-unit-price" type="number" step="1" inputmode="numeric" placeholder="0" value="${prefill?.unit_price ?? ""}" /></td>
     <td>
       <select class="item-tax-rate">
@@ -276,6 +279,18 @@ function recalcInvoiceTotals() {
   [...invoiceItemsTbody.querySelectorAll("tr")].forEach((tr, idx) => {
     const item = items[idx];
     tr.querySelector(".item-subtotal").textContent = formatYen(item.quantity * item.unit_price);
+
+    const warnEl = tr.querySelector(".item-stock-warn");
+    const qtyInput = tr.querySelector(".item-quantity");
+    if (item.product && item.quantity > item.product.quantity) {
+      warnEl.textContent = "⚠ 在庫不足";
+      warnEl.title = `現在庫: ${item.product.quantity}`;
+      qtyInput.classList.add("input-error");
+    } else {
+      warnEl.textContent = "";
+      warnEl.title = "";
+      qtyInput.classList.remove("input-error");
+    }
   });
 
   const totals = computeInvoiceTotals(items.filter((i) => i.product_id), readInvoiceAdjustmentsFromDom());

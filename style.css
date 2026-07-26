@@ -450,7 +450,17 @@ dialog input, dialog select, dialog textarea {
   box-sizing: border-box;
 }
 .invoice-items-wrap .col-item-name { width: 34%; }
-.invoice-items-wrap .col-item-qty { width: 8%; }
+.invoice-items-wrap .col-item-qty { width: 10%; }
+
+.item-stock-warn {
+  font-size: 0.68rem;
+  color: var(--color-danger);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+.invoice-items-wrap input.input-error {
+  border-color: var(--color-danger);
+}
 .invoice-items-wrap .col-item-price { width: 18%; }
 .invoice-items-wrap .col-item-rate { width: 16%; }
 .invoice-items-wrap .col-item-subtotal { width: 16%; }
