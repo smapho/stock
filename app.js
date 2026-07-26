@@ -322,7 +322,7 @@ function updatePricePreview() {
 function openProductDialog(product = null) {
   productForm.reset();
   document.getElementById("field-unit").value = "個";
-  document.getElementById("field-quantity").value = 0;
+  document.getElementById("field-quantity").value = 1;
   document.getElementById("field-low-threshold").value = 0;
   fieldPriceIncludesTax.value = "false";
   fieldTaxRate.value = "0.10";
