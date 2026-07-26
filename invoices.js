@@ -2,10 +2,12 @@ const invoicesTbody = document.getElementById("invoices-tbody");
 const addInvoiceBtn = document.getElementById("add-invoice-btn");
 
 const invoiceDialog = document.getElementById("invoice-dialog");
+const invoiceDialogTitle = document.getElementById("invoice-dialog-title");
 const invoiceForm = document.getElementById("invoice-form");
 const invoiceFieldCustomer = document.getElementById("invoice-field-customer");
 const invoiceFieldIssueDate = document.getElementById("invoice-field-issue-date");
 const invoiceFieldDueDate = document.getElementById("invoice-field-due-date");
+const invoiceFieldDiscount = document.getElementById("invoice-field-discount");
 const invoiceFieldNotes = document.getElementById("invoice-field-notes");
 const invoiceItemsTbody = document.getElementById("invoice-items-tbody");
 const addInvoiceItemBtn = document.getElementById("add-invoice-item-btn");
@@ -21,31 +23,38 @@ const companySettingsForm = document.getElementById("company-settings-form");
 const cancelCompanyDialogBtn = document.getElementById("cancel-company-dialog-btn");
 
 const invoicePrintView = document.getElementById("invoice-print-view");
+const invoicePreviewView = document.getElementById("invoice-preview-view");
 
 let invoices = [];
 let invoicesLoaded = false;
 let companySettings = null;
 
 // --- 税率ごとに一括で消費税を計算(行ごとには計算しない) ---
-// 税率区分ごとの税抜合計に対して1回だけ端数処理する(インボイス制度の計算方法)
-function computeInvoiceTotals(items) {
+// 税率区分ごとの税抜合計に対して1回だけ端数処理する(インボイス制度の計算方法)。
+// 値引きは税率区分ごとの税抜金額の比率で按分してから税額計算する。
+function computeInvoiceTotals(items, discountInput = 0) {
   const groups = new Map();
   for (const it of items) {
     const rate = Number(it.tax_rate);
     const lineExcl = Number(it.quantity) * Number(it.unit_price);
     groups.set(rate, (groups.get(rate) || 0) + lineExcl);
   }
+  const rawSubtotal = [...groups.values()].reduce((sum, v) => sum + v, 0);
+  const discount = Math.max(0, Math.min(Number(discountInput) || 0, rawSubtotal));
+
   let subtotalExcl = 0;
   let totalTax = 0;
   const breakdown = [...groups.entries()]
     .sort((a, b) => b[0] - a[0])
-    .map(([rate, taxableAmount]) => {
+    .map(([rate, rawAmount]) => {
+      const share = rawSubtotal > 0 ? rawAmount / rawSubtotal : 0;
+      const taxableAmount = rawAmount - discount * share;
       const tax = Math.floor(taxableAmount * rate);
       subtotalExcl += taxableAmount;
       totalTax += tax;
       return { rate, taxableAmount, tax };
     });
-  return { breakdown, subtotalExcl, totalTax, grandTotal: subtotalExcl + totalTax };
+  return { breakdown, subtotalExcl, totalTax, grandTotal: subtotalExcl + totalTax, discount, rawSubtotal };
 }
 
 // --- 請求書一覧 ---
@@ -57,8 +66,9 @@ function renderInvoices() {
   }
   invoicesTbody.innerHTML = invoices
     .map((inv) => {
-      const totals = computeInvoiceTotals(inv.invoice_items || []);
+      const totals = computeInvoiceTotals(inv.invoice_items || [], inv.discount_amount || 0);
       const customerName = inv.customer?.name || "-";
+      const editable = inv.status === "issued" || inv.status === "paid";
       return `
         <tr data-id="${inv.id}">
           <td>${escapeHtml(inv.invoice_number)}</td>
@@ -69,6 +79,7 @@ function renderInvoices() {
           <td>
             <div class="row-actions">
               <button class="btn btn-sm invoice-print-btn" data-id="${inv.id}">🖨 印刷</button>
+              ${editable ? `<button class="btn btn-sm invoice-edit-btn" data-id="${inv.id}">修正</button>` : ""}
               ${inv.status === "issued" ? `<button class="btn btn-sm btn-danger invoice-cancel-btn" data-id="${inv.id}">取消</button>` : ""}
               ${inv.status === "issued" ? `<button class="btn btn-sm invoice-paid-btn" data-id="${inv.id}">入金済みに</button>` : ""}
             </div>
@@ -98,12 +109,16 @@ async function loadInvoices() {
 
 invoicesTbody.addEventListener("click", async (e) => {
   const printBtn = e.target.closest(".invoice-print-btn");
+  const editBtn = e.target.closest(".invoice-edit-btn");
   const cancelBtn = e.target.closest(".invoice-cancel-btn");
   const paidBtn = e.target.closest(".invoice-paid-btn");
 
   if (printBtn) {
     const invoice = invoices.find((i) => i.id === printBtn.dataset.id);
     if (invoice) await openInvoicePrintView(invoice);
+  } else if (editBtn) {
+    const invoice = invoices.find((i) => i.id === editBtn.dataset.id);
+    if (invoice) await openInvoiceDialog(invoice);
   } else if (cancelBtn) {
     if (!confirm("この請求書を取消しますか?出庫済みの在庫は元に戻ります。")) return;
     const { error } = await supabaseClient.rpc("cancel_invoice", { p_invoice_id: cancelBtn.dataset.id });
@@ -125,7 +140,7 @@ invoicesTbody.addEventListener("click", async (e) => {
   }
 });
 
-// --- 請求書作成ダイアログ ---
+// --- 請求書作成・編集ダイアログ ---
 
 function refreshInvoiceCustomerOptions() {
   const current = invoiceFieldCustomer.value;
@@ -144,12 +159,13 @@ function productOptionsHtml(selectedId) {
   );
 }
 
-function addInvoiceItemRow() {
+function addInvoiceItemRow(prefill = null) {
   const tr = document.createElement("tr");
+  const selectedId = prefill?.product_id || "";
   tr.innerHTML = `
-    <td><select class="item-product">${productOptionsHtml("")}</select></td>
-    <td><input class="item-quantity" type="number" min="1" step="1" value="1" /></td>
-    <td><input class="item-unit-price" type="number" min="0" step="1" value="0" /></td>
+    <td><select class="item-product">${productOptionsHtml(selectedId)}</select></td>
+    <td><input class="item-quantity" type="number" min="1" step="1" value="${prefill?.quantity ?? 1}" /></td>
+    <td><input class="item-unit-price" type="number" step="1" inputmode="numeric" placeholder="0" value="${prefill?.unit_price ?? ""}" /></td>
     <td>
       <select class="item-tax-rate">
         <option value="0.10" selected>10%</option>
@@ -161,6 +177,9 @@ function addInvoiceItemRow() {
     <td><button type="button" class="btn btn-sm btn-danger remove-item-btn">削除</button></td>
   `;
   invoiceItemsTbody.appendChild(tr);
+  if (prefill) {
+    setSelectByNumericValue(tr.querySelector(".item-tax-rate"), prefill.tax_rate ?? 0.10, "0.10");
+  }
 }
 
 invoiceItemsTbody.addEventListener("change", (e) => {
@@ -168,14 +187,15 @@ invoiceItemsTbody.addEventListener("change", (e) => {
     const tr = e.target.closest("tr");
     const product = products.find((p) => p.id === e.target.value);
     if (product) {
-      const excl = toExclTax(product.price, product.price_includes_tax, product.tax_rate) || 0;
-      tr.querySelector(".item-unit-price").value = Math.round(excl);
+      const excl = toExclTax(product.price, product.price_includes_tax, product.tax_rate);
+      tr.querySelector(".item-unit-price").value = excl !== null ? Math.round(excl) : "";
       setSelectByNumericValue(tr.querySelector(".item-tax-rate"), product.tax_rate ?? 0.10, "0.10");
     }
   }
   recalcInvoiceTotals();
 });
 invoiceItemsTbody.addEventListener("input", recalcInvoiceTotals);
+invoiceFieldDiscount.addEventListener("input", recalcInvoiceTotals);
 
 invoiceItemsTbody.addEventListener("click", (e) => {
   const btn = e.target.closest(".remove-item-btn");
@@ -202,7 +222,7 @@ function recalcInvoiceTotals() {
     tr.querySelector(".item-subtotal").textContent = formatYen(item.quantity * item.unit_price);
   });
 
-  const totals = computeInvoiceTotals(items.filter((i) => i.product_id));
+  const totals = computeInvoiceTotals(items.filter((i) => i.product_id), invoiceFieldDiscount.value);
   invoiceSubtotalEl.textContent = formatYen(totals.subtotalExcl);
   invoiceTaxEl.textContent = formatYen(totals.totalTax);
   invoiceTotalEl.textContent = formatYen(totals.grandTotal);
@@ -215,26 +235,108 @@ function recalcInvoiceTotals() {
     .join("");
 }
 
-async function openInvoiceDialog() {
+async function openInvoiceDialog(invoice = null) {
   if (!customersLoaded) await loadCustomers();
   refreshInvoiceCustomerOptions();
   invoiceForm.reset();
-  invoiceFieldIssueDate.value = todayStr();
-  invoiceFieldDueDate.value = "";
   invoiceItemsTbody.innerHTML = "";
-  addInvoiceItemRow();
+
+  if (invoice) {
+    invoiceDialogTitle.textContent = `請求書を修正(${invoice.invoice_number})`;
+    document.getElementById("invoice-id").value = invoice.id;
+    invoiceFieldCustomer.value = invoice.customer_id || "";
+    invoiceFieldIssueDate.value = invoice.issue_date;
+    invoiceFieldDueDate.value = invoice.due_date || "";
+    invoiceFieldDiscount.value = invoice.discount_amount || 0;
+    invoiceFieldNotes.value = invoice.notes || "";
+
+    const { data: items, error } = await supabaseClient
+      .from("invoice_items")
+      .select("*")
+      .eq("invoice_id", invoice.id)
+      .order("sort_order");
+    if (error) {
+      showToast(`明細読み込みエラー: ${error.message}`, true);
+      return;
+    }
+    if (items.length === 0) {
+      addInvoiceItemRow();
+    } else {
+      items.forEach((item) => addInvoiceItemRow(item));
+    }
+  } else {
+    invoiceDialogTitle.textContent = "請求書を作成(出荷登録)";
+    document.getElementById("invoice-id").value = "";
+    invoiceFieldIssueDate.value = todayStr();
+    invoiceFieldDueDate.value = "";
+    invoiceFieldDiscount.value = 0;
+    addInvoiceItemRow();
+  }
+
   recalcInvoiceTotals();
   invoiceDialog.showModal();
 }
 
-addInvoiceBtn.addEventListener("click", openInvoiceDialog);
+addInvoiceBtn.addEventListener("click", () => openInvoiceDialog());
 addInvoiceItemBtn.addEventListener("click", () => {
   addInvoiceItemRow();
   recalcInvoiceTotals();
 });
 cancelInvoiceDialogBtn.addEventListener("click", () => invoiceDialog.close());
 
-invoiceForm.addEventListener("submit", async (e) => {
+// --- 発行前プレビュー ---
+
+function customerNameById(id) {
+  return customers.find((c) => c.id === id)?.name || "";
+}
+
+function buildInvoicePreviewHtml({ isEdit, invoiceNumberLabel, customerName, issueDate, dueDate, notes, items, totals }) {
+  return `
+    <div class="print-actions">
+      <button type="button" class="btn" id="invoice-preview-back-btn">✏️ 内容を修正する</button>
+      <button type="button" class="btn btn-primary" id="invoice-preview-confirm-btn">${isEdit ? "この内容で修正を確定する" : "この内容で発行し、出庫を確定する"}</button>
+    </div>
+    <div class="print-header">
+      <div>
+        <h2>請求書プレビュー</h2>
+        <p>${escapeHtml(invoiceNumberLabel)}</p>
+        <p>発行日: ${escapeHtml(issueDate)}${dueDate ? ` / 支払期限: ${escapeHtml(dueDate)}` : ""}</p>
+      </div>
+    </div>
+    <p><strong>${escapeHtml(customerName)}</strong> 様</p>
+    <table>
+      <thead><tr><th>商品名</th><th>数量</th><th>単価(税抜)</th><th>税率区分</th><th>小計(税抜)</th></tr></thead>
+      <tbody>
+        ${items
+          .map(
+            (it) => `
+          <tr>
+            <td>${escapeHtml(it.product?.name || "(不明な商品)")}</td>
+            <td>${it.quantity} ${escapeHtml(it.product?.unit || "")}</td>
+            <td>${formatYen(it.unit_price)}</td>
+            <td>${formatPercent(it.tax_rate)}</td>
+            <td>${formatYen(it.quantity * it.unit_price)}</td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <table class="print-tax-summary">
+      <thead><tr><th>税率区分</th><th>税抜金額</th><th>消費税額</th></tr></thead>
+      <tbody>
+        ${totals.breakdown
+          .map((b) => `<tr><td>${formatPercent(b.rate)}対象</td><td>${formatYen(b.taxableAmount)}</td><td>${formatYen(b.tax)}</td></tr>`)
+          .join("")}
+      </tbody>
+    </table>
+    ${totals.discount > 0 ? `<p>値引き(税抜): -${formatYen(totals.discount)}</p>` : ""}
+    <p>税抜合計(値引き後): ${formatYen(totals.subtotalExcl)} / 消費税合計: ${formatYen(totals.totalTax)}</p>
+    <p style="font-size:1.2rem;"><strong>ご請求金額(税込合計): ${formatYen(totals.grandTotal)}</strong></p>
+    ${notes ? `<p>【備考】<br>${escapeHtml(notes).replace(/\n/g, "<br>")}</p>` : ""}
+  `;
+}
+
+invoiceForm.addEventListener("submit", (e) => {
   e.preventDefault();
   if (!invoiceFieldCustomer.value) {
     showToast("販売先を選択してください", true);
@@ -252,29 +354,99 @@ invoiceForm.addEventListener("submit", async (e) => {
     }
   }
 
-  const { data, error } = await supabaseClient.rpc("create_invoice", {
-    p_customer_id: invoiceFieldCustomer.value,
-    p_issue_date: invoiceFieldIssueDate.value || null,
-    p_due_date: invoiceFieldDueDate.value || null,
-    p_notes: invoiceFieldNotes.value.trim() || null,
-    p_items: items.map((i, idx) => ({
-      product_id: i.product_id,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      tax_rate: i.tax_rate,
-      sort_order: idx,
-    })),
+  const invoiceId = document.getElementById("invoice-id").value || null;
+  const isEdit = !!invoiceId;
+  const existingInvoice = isEdit ? invoices.find((i) => i.id === invoiceId) : null;
+  const discount = Number(invoiceFieldDiscount.value) || 0;
+  const totals = computeInvoiceTotals(items, discount);
+
+  const pendingSubmit = {
+    invoiceId,
+    isEdit,
+    customerId: invoiceFieldCustomer.value,
+    issueDate: invoiceFieldIssueDate.value || null,
+    dueDate: invoiceFieldDueDate.value || null,
+    notes: invoiceFieldNotes.value.trim() || null,
+    discount,
+    items,
+  };
+
+  const html = buildInvoicePreviewHtml({
+    isEdit,
+    invoiceNumberLabel: isEdit ? `請求書番号: ${existingInvoice?.invoice_number || ""}` : "請求書番号: (発行時に自動採番されます)",
+    customerName: customerNameById(pendingSubmit.customerId),
+    issueDate: pendingSubmit.issueDate,
+    dueDate: pendingSubmit.dueDate,
+    notes: pendingSubmit.notes,
+    items,
+    totals,
   });
 
+  // <dialog> はブラウザのトップレイヤーに描画されるため、開いたままではプレビューの
+  // <div> がクリックを受け取れない。プレビュー表示中は一旦ダイアログを閉じる。
+  invoiceDialog.close();
+  invoicePreviewView.innerHTML = html;
+  invoicePreviewView.hidden = false;
+
+  document.getElementById("invoice-preview-back-btn").addEventListener("click", () => {
+    invoicePreviewView.hidden = true;
+    invoicePreviewView.innerHTML = "";
+    invoiceDialog.showModal();
+  });
+  document.getElementById("invoice-preview-confirm-btn").addEventListener("click", () => confirmInvoiceSubmit(pendingSubmit));
+});
+
+async function confirmInvoiceSubmit(pending) {
+  const rpcName = pending.isEdit ? "update_invoice" : "create_invoice";
+  const params = pending.isEdit
+    ? {
+        p_invoice_id: pending.invoiceId,
+        p_customer_id: pending.customerId,
+        p_issue_date: pending.issueDate,
+        p_due_date: pending.dueDate,
+        p_notes: pending.notes,
+        p_items: pending.items.map((i, idx) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          tax_rate: i.tax_rate,
+          sort_order: idx,
+        })),
+        p_discount_amount: pending.discount,
+      }
+    : {
+        p_customer_id: pending.customerId,
+        p_issue_date: pending.issueDate,
+        p_due_date: pending.dueDate,
+        p_notes: pending.notes,
+        p_items: pending.items.map((i, idx) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          tax_rate: i.tax_rate,
+          sort_order: idx,
+        })),
+        p_discount_amount: pending.discount,
+      };
+
+  const { data, error } = await supabaseClient.rpc(rpcName, params);
+
+  invoicePreviewView.hidden = true;
+  invoicePreviewView.innerHTML = "";
+
   if (error) {
-    showToast(`発行エラー: ${error.message}`, true);
+    showToast(`${pending.isEdit ? "修正" : "発行"}エラー: ${error.message}`, true);
     return;
   }
 
-  showToast(`請求書 ${data.invoice_number} を発行し、出庫を確定しました`);
+  showToast(
+    pending.isEdit
+      ? `請求書 ${data.invoice_number} を修正し、在庫を再調整しました`
+      : `請求書 ${data.invoice_number} を発行し、出庫を確定しました`
+  );
   invoiceDialog.close();
   await Promise.all([loadInvoices(), loadProducts()]);
-});
+}
 
 // --- 発行者(自社)情報 ---
 
@@ -321,7 +493,7 @@ companySettingsForm.addEventListener("submit", async (e) => {
   companySettingsDialog.close();
 });
 
-// --- 請求書 印刷ビュー ---
+// --- 請求書 印刷ビュー(発行済みの請求書を表示) ---
 
 async function openInvoicePrintView(invoice) {
   const { data: fullInvoice, error } = await supabaseClient
@@ -337,7 +509,7 @@ async function openInvoicePrintView(invoice) {
   const s = companySettings || {};
 
   const items = [...fullInvoice.invoice_items].sort((a, b) => a.sort_order - b.sort_order);
-  const totals = computeInvoiceTotals(items);
+  const totals = computeInvoiceTotals(items, fullInvoice.discount_amount || 0);
 
   invoicePrintView.innerHTML = `
     <div class="print-actions">
@@ -392,6 +564,7 @@ async function openInvoicePrintView(invoice) {
       </tbody>
     </table>
 
+    ${totals.discount > 0 ? `<p>値引き(税抜): -${formatYen(totals.discount)}</p>` : ""}
     <p style="font-size:1.2rem;"><strong>ご請求金額(税込合計): ${formatYen(totals.grandTotal)}</strong></p>
 
     ${s.bank_info ? `<p>【お振込先】<br>${escapeHtml(s.bank_info).replace(/\n/g, "<br>")}</p>` : ""}

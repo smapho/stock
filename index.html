@@ -414,7 +414,8 @@
   <!-- 請求書作成モーダル -->
   <dialog id="invoice-dialog">
     <form id="invoice-form" method="dialog" class="invoice-form">
-      <h2>請求書を作成(出荷登録)</h2>
+      <h2 id="invoice-dialog-title">請求書を作成(出荷登録)</h2>
+      <input type="hidden" id="invoice-id" />
       <div class="field-row">
         <label>販売先 <span class="required">*</span>
           <select id="invoice-field-customer" required></select>
@@ -446,11 +447,15 @@
       </div>
       <button type="button" id="add-invoice-item-btn" class="btn btn-sm">＋ 明細行を追加</button>
 
+      <label>値引き(税抜円、請求書全体に適用)
+        <input id="invoice-field-discount" type="number" min="0" step="1" value="0" />
+      </label>
+
       <div class="invoice-totals" id="invoice-tax-breakdown">
         <!-- 税率ごとの内訳(税抜小計・消費税)をJSで生成 -->
       </div>
       <div class="invoice-totals">
-        <div>税抜合計: <span id="invoice-subtotal">¥0</span></div>
+        <div>税抜合計(値引き後): <span id="invoice-subtotal">¥0</span></div>
         <div>消費税合計: <span id="invoice-tax">¥0</span></div>
         <div class="invoice-total-grand">税込合計: <span id="invoice-total">¥0</span></div>
       </div>
@@ -462,11 +467,14 @@
       <div class="dialog-actions">
         <div class="dialog-actions-right">
           <button type="button" id="cancel-invoice-dialog-btn" class="btn">キャンセル</button>
-          <button type="submit" class="btn btn-primary">発行して出庫を確定</button>
+          <button type="submit" class="btn btn-primary">内容を確認</button>
         </div>
       </div>
     </form>
   </dialog>
+
+  <!-- 請求書 発行前プレビュー -->
+  <div id="invoice-preview-view" class="print-overlay" hidden></div>
 
   <!-- 請求書印刷プレビュー -->
   <div id="invoice-print-view" class="print-overlay" hidden></div>
