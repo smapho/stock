@@ -74,6 +74,47 @@ body {
   flex-wrap: wrap;
 }
 
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab-btn:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.tab-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.panel-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.panel-toolbar input,
+.panel-toolbar select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 main {
   max-width: 1000px;
   margin: 0 auto;
@@ -159,6 +200,11 @@ tbody tr.low-stock {
 
 .qty-badge.low {
   color: var(--color-warn-text);
+}
+
+.price-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .row-actions {
@@ -317,4 +363,198 @@ dialog input, dialog select, dialog textarea {
 .toast.error {
   background: var(--color-danger);
   color: white;
+}
+
+/* --- 商品フォーム: 税区分 --- */
+.field-with-action {
+  display: flex;
+  gap: 8px;
+}
+.field-with-action select { flex: 1; }
+
+.price-preview {
+  margin: -4px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* --- カテゴリ管理ダイアログ --- */
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+.inline-form input { flex: 1; }
+
+.simple-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.simple-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+.simple-list li:last-child { border-bottom: none; }
+
+/* --- 請求書フォーム --- */
+#invoice-dialog, #customer-dialog, #company-settings-dialog {
+  width: min(560px, 94vw);
+}
+
+.invoice-form h3 {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
+.invoice-items-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.invoice-items-wrap table {
+  min-width: 0;
+}
+.invoice-items-wrap th, .invoice-items-wrap td {
+  padding: 6px 8px;
+  font-size: 0.82rem;
+}
+.invoice-items-wrap select, .invoice-items-wrap input {
+  width: 100%;
+  padding: 6px 8px;
+}
+
+.invoice-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+.invoice-totals .invoice-total-grand {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* --- 請求書印刷ビュー --- */
+.invoice-print-view {
+  position: fixed;
+  inset: 0;
+  background: white;
+  color: #111;
+  z-index: 1000;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.invoice-print-view .print-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.invoice-print-view table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+.invoice-print-view th, .invoice-print-view td {
+  border: 1px solid #ccc;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.print-header h2 { margin: 0; font-size: 1.4rem; }
+
+.print-tax-summary td, .print-tax-summary th {
+  text-align: right;
+}
+.print-tax-summary th:first-child, .print-tax-summary td:first-child {
+  text-align: left;
+}
+
+@media print {
+  body > *:not(.invoice-print-view) { display: none !important; }
+  .invoice-print-view { position: static; padding: 0; }
+  .invoice-print-view .print-actions { display: none !important; }
+}
+
+/* --- レポートタブ --- */
+.report-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 480px;
+}
+.report-card h2 { margin-top: 0; font-size: 1.05rem; }
+.report-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+.report-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.report-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+.report-form input {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid var(--color-border);
+}
+.status-badge.issued { color: var(--color-primary); border-color: var(--color-primary); }
+.status-badge.paid { color: #16a34a; border-color: #16a34a; }
+.status-badge.cancelled { color: var(--color-text-muted); text-decoration: line-through; }
+
+/* --- マスタタブ --- */
+.master-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.master-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.master-section h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
 }

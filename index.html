@@ -9,41 +9,142 @@
 <body>
   <header class="app-header">
     <h1>在庫管理</h1>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="inventory">在庫</button>
+      <button class="tab-btn" data-tab="customers">取引先</button>
+      <button class="tab-btn" data-tab="invoices">請求書/出荷</button>
+      <button class="tab-btn" data-tab="masters">マスタ</button>
+      <button class="tab-btn" data-tab="reports">レポート</button>
+    </nav>
     <div class="header-actions">
-      <input id="search-input" type="search" placeholder="商品名・SKUで検索" />
-      <button id="scan-barcode-btn" class="btn">📷 バーコードでスキャン</button>
-      <button id="add-product-btn" class="btn btn-primary">＋ 商品を追加</button>
+      <button id="company-settings-btn" class="btn">⚙ 発行者情報</button>
     </div>
   </header>
 
   <main>
-    <section class="summary-bar">
-      <div class="summary-card">
-        <span class="summary-label">商品数</span>
-        <span class="summary-value" id="summary-total">0</span>
+    <!-- ============ 在庫タブ ============ -->
+    <section class="tab-panel" data-tab-panel="inventory">
+      <div class="panel-toolbar">
+        <input id="search-input" type="search" placeholder="商品名・SKUで検索" />
+        <select id="brand-filter"><option value="">全ブランド</option></select>
+        <select id="category-filter"><option value="">全カテゴリ</option></select>
+        <button id="scan-barcode-btn" class="btn">📷 バーコードでスキャン</button>
+        <button id="add-product-btn" class="btn btn-primary">＋ 商品を追加</button>
       </div>
-      <div class="summary-card summary-card-warn">
-        <span class="summary-label">在庫僅少</span>
-        <span class="summary-value" id="summary-low">0</span>
+
+      <div class="summary-bar">
+        <div class="summary-card">
+          <span class="summary-label">商品数</span>
+          <span class="summary-value" id="summary-total">0</span>
+        </div>
+        <div class="summary-card summary-card-warn">
+          <span class="summary-label">在庫僅少</span>
+          <span class="summary-value" id="summary-low">0</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="products-table">
+          <thead>
+            <tr>
+              <th>商品名</th>
+              <th>SKU</th>
+              <th>ブランド</th>
+              <th>カテゴリ</th>
+              <th>数量</th>
+              <th>単価</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="products-tbody">
+            <tr class="empty-row"><td colspan="7">読み込み中…</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
-    <section class="table-wrap">
-      <table id="products-table">
-        <thead>
-          <tr>
-            <th>商品名</th>
-            <th>SKU</th>
-            <th>カテゴリ</th>
-            <th>数量</th>
-            <th>単価</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="products-tbody">
-          <tr class="empty-row"><td colspan="6">読み込み中…</td></tr>
-        </tbody>
-      </table>
+    <!-- ============ 取引先タブ ============ -->
+    <section class="tab-panel" data-tab-panel="customers" hidden>
+      <div class="panel-toolbar">
+        <input id="customer-search-input" type="search" placeholder="取引先名で検索" />
+        <button id="add-customer-btn" class="btn btn-primary">＋ 取引先を追加</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>取引先名</th>
+              <th>担当者</th>
+              <th>電話番号</th>
+              <th>メール</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="customers-tbody">
+            <tr class="empty-row"><td colspan="5">読み込み中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 請求書/出荷タブ ============ -->
+    <section class="tab-panel" data-tab-panel="invoices" hidden>
+      <div class="panel-toolbar">
+        <button id="add-invoice-btn" class="btn btn-primary">＋ 請求書を作成(出荷)</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>請求書番号</th>
+              <th>販売先</th>
+              <th>発行日</th>
+              <th>合計金額</th>
+              <th>状態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="invoices-tbody">
+            <tr class="empty-row"><td colspan="6">読み込み中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ マスタタブ ============ -->
+    <section class="tab-panel" data-tab-panel="masters" hidden>
+      <div class="master-grid">
+        <div class="master-section">
+          <h2>カテゴリ管理</h2>
+          <form id="category-add-form-master" class="inline-form">
+            <input id="category-new-name-master" type="text" placeholder="新しいカテゴリ名" required />
+            <button type="submit" class="btn btn-primary btn-sm">追加</button>
+          </form>
+          <ul id="category-list-master" class="simple-list"></ul>
+        </div>
+        <div class="master-section">
+          <h2>ブランド管理</h2>
+          <form id="brand-add-form-master" class="inline-form">
+            <input id="brand-new-name-master" type="text" placeholder="新しいブランド名" required />
+            <button type="submit" class="btn btn-primary btn-sm">追加</button>
+          </form>
+          <ul id="brand-list-master" class="simple-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ レポートタブ ============ -->
+    <section class="tab-panel" data-tab-panel="reports" hidden>
+      <div class="report-card">
+        <h2>月末在庫表の出力</h2>
+        <p class="report-desc">指定した月の月末時点の在庫数量をCSVで出力します(入出庫履歴から算出するため、過去の月でも正確な数量を再現します)。</p>
+        <div class="report-form">
+          <label>対象年月
+            <input id="report-month" type="month" />
+          </label>
+          <button id="export-report-btn" class="btn btn-primary">CSVを出力</button>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -59,8 +160,17 @@
       <label>SKU
         <input id="field-sku" type="text" />
       </label>
+      <label>ブランド(メーカー)
+        <span class="field-with-action">
+          <select id="field-brand"><option value="">未設定</option></select>
+          <button type="button" id="manage-brands-btn" class="btn btn-sm">管理</button>
+        </span>
+      </label>
       <label>カテゴリ
-        <input id="field-category" type="text" />
+        <span class="field-with-action">
+          <select id="field-category"><option value="">未分類</option></select>
+          <button type="button" id="manage-categories-btn" class="btn btn-sm">管理</button>
+        </span>
       </label>
       <div class="field-row">
         <label>数量
@@ -78,6 +188,22 @@
           <input id="field-price" type="number" min="0" step="1" />
         </label>
       </div>
+      <div class="field-row">
+        <label>単価の税区分
+          <select id="field-price-includes-tax">
+            <option value="false">税抜</option>
+            <option value="true">税込</option>
+          </select>
+        </label>
+        <label>消費税率
+          <select id="field-tax-rate">
+            <option value="0.10" selected>10%</option>
+            <option value="0.08">8%(軽減税率)</option>
+            <option value="0">0%(非課税)</option>
+          </select>
+        </label>
+      </div>
+      <p id="field-price-preview" class="price-preview"></p>
       <label>メモ
         <textarea id="field-notes" rows="2"></textarea>
       </label>
@@ -90,6 +216,40 @@
         </div>
       </div>
     </form>
+  </dialog>
+
+  <!-- カテゴリ管理モーダル -->
+  <dialog id="category-dialog">
+    <div class="scan-body">
+      <h2>カテゴリ管理</h2>
+      <form id="category-add-form" class="inline-form">
+        <input id="category-new-name" type="text" placeholder="新しいカテゴリ名" required />
+        <button type="submit" class="btn btn-primary btn-sm">追加</button>
+      </form>
+      <ul id="category-list" class="simple-list"></ul>
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="close-category-dialog-btn" class="btn">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ブランド管理モーダル -->
+  <dialog id="brand-dialog">
+    <div class="scan-body">
+      <h2>ブランド管理</h2>
+      <form id="brand-add-form" class="inline-form">
+        <input id="brand-new-name" type="text" placeholder="新しいブランド名" required />
+        <button type="submit" class="btn btn-primary btn-sm">追加</button>
+      </form>
+      <ul id="brand-list" class="simple-list"></ul>
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="close-brand-dialog-btn" class="btn">閉じる</button>
+        </div>
+      </div>
+    </div>
   </dialog>
 
   <!-- 入出庫モーダル -->
@@ -136,11 +296,143 @@
     </div>
   </dialog>
 
+  <!-- 取引先追加・編集モーダル -->
+  <dialog id="customer-dialog">
+    <form id="customer-form" method="dialog">
+      <h2 id="customer-dialog-title">取引先を追加</h2>
+      <input type="hidden" id="customer-id" />
+      <label>取引先名 <span class="required">*</span>
+        <input id="customer-field-name" type="text" required />
+      </label>
+      <label>担当者名
+        <input id="customer-field-contact" type="text" />
+      </label>
+      <div class="field-row">
+        <label>電話番号
+          <input id="customer-field-phone" type="text" />
+        </label>
+        <label>メールアドレス
+          <input id="customer-field-email" type="email" />
+        </label>
+      </div>
+      <label>住所
+        <input id="customer-field-address" type="text" />
+      </label>
+      <label>メモ
+        <textarea id="customer-field-notes" rows="2"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="delete-customer-btn" class="btn btn-danger" hidden>削除</button>
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-customer-dialog-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 発行者情報モーダル -->
+  <dialog id="company-settings-dialog">
+    <form id="company-settings-form" method="dialog">
+      <h2>発行者情報(請求書に表示)</h2>
+      <label>会社名・屋号
+        <input id="company-field-name" type="text" />
+      </label>
+      <div class="field-row">
+        <label>郵便番号
+          <input id="company-field-postal" type="text" />
+        </label>
+        <label>電話番号
+          <input id="company-field-phone" type="text" />
+        </label>
+      </div>
+      <label>住所
+        <input id="company-field-address" type="text" />
+      </label>
+      <label>インボイス登録番号
+        <input id="company-field-invoice-number" type="text" placeholder="T1234567890123" />
+      </label>
+      <label>振込先情報
+        <textarea id="company-field-bank" rows="2" placeholder="◯◯銀行 ◯◯支店 普通 1234567"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-company-dialog-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 請求書作成モーダル -->
+  <dialog id="invoice-dialog">
+    <form id="invoice-form" method="dialog" class="invoice-form">
+      <h2>請求書を作成(出荷登録)</h2>
+      <div class="field-row">
+        <label>販売先 <span class="required">*</span>
+          <select id="invoice-field-customer" required></select>
+        </label>
+        <label>発行日
+          <input id="invoice-field-issue-date" type="date" required />
+        </label>
+      </div>
+      <label>支払期限
+        <input id="invoice-field-due-date" type="date" />
+      </label>
+
+      <h3>出荷明細</h3>
+      <p class="invoice-items-note">単価・小計は税抜金額で入力・表示します。消費税は行ごとには計算せず、最後に10%対象・8%対象などの税率区分ごとにまとめて計算します。</p>
+      <div class="table-wrap invoice-items-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>商品</th>
+              <th>数量</th>
+              <th>単価(税抜)</th>
+              <th>税率区分</th>
+              <th>小計(税抜)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="invoice-items-tbody"></tbody>
+        </table>
+      </div>
+      <button type="button" id="add-invoice-item-btn" class="btn btn-sm">＋ 明細行を追加</button>
+
+      <div class="invoice-totals" id="invoice-tax-breakdown">
+        <!-- 税率ごとの内訳(税抜小計・消費税)をJSで生成 -->
+      </div>
+      <div class="invoice-totals">
+        <div>税抜合計: <span id="invoice-subtotal">¥0</span></div>
+        <div>消費税合計: <span id="invoice-tax">¥0</span></div>
+        <div class="invoice-total-grand">税込合計: <span id="invoice-total">¥0</span></div>
+      </div>
+
+      <label>備考
+        <textarea id="invoice-field-notes" rows="2"></textarea>
+      </label>
+
+      <div class="dialog-actions">
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-invoice-dialog-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">発行して出庫を確定</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 請求書印刷プレビュー -->
+  <div id="invoice-print-view" class="invoice-print-view" hidden></div>
+
   <div id="toast" class="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://unpkg.com/@zxing/browser@latest"></script>
   <script src="config.js"></script>
+  <script src="common.js"></script>
   <script src="app.js"></script>
+  <script src="customers.js"></script>
+  <script src="invoices.js"></script>
+  <script src="reports.js"></script>
 </body>
 </html>
