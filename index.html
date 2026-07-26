@@ -432,6 +432,14 @@
       <p class="invoice-items-note">単価・小計は税抜金額で入力・表示します。消費税は行ごとには計算せず、最後に10%対象・8%対象などの税率区分ごとにまとめて計算します。</p>
       <div class="table-wrap invoice-items-wrap">
         <table>
+          <colgroup>
+            <col class="col-item-name" />
+            <col class="col-item-qty" />
+            <col class="col-item-price" />
+            <col class="col-item-rate" />
+            <col class="col-item-subtotal" />
+            <col class="col-item-remove" />
+          </colgroup>
           <thead>
             <tr>
               <th>商品</th>
@@ -447,9 +455,29 @@
       </div>
       <button type="button" id="add-invoice-item-btn" class="btn btn-sm">＋ 明細行を追加</button>
 
-      <label>値引き(税抜円、請求書全体に適用)
-        <input id="invoice-field-discount" type="number" min="0" step="1" value="0" />
-      </label>
+      <h3>値引き・その他調整(税抜円、税率区分ごと)</h3>
+      <p class="invoice-items-note">値引き以外の調整(追加料金など)がある場合は「そのほか」に入力してください(マイナス値も可)。</p>
+      <div class="table-wrap">
+        <table class="adjustments-table">
+          <thead>
+            <tr><th></th><th>10%対象</th><th>8%対象</th><th>0%対象</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>値引き</th>
+              <td><input id="invoice-discount-10" type="number" min="0" step="1" value="0" /></td>
+              <td><input id="invoice-discount-8" type="number" min="0" step="1" value="0" /></td>
+              <td><input id="invoice-discount-0" type="number" min="0" step="1" value="0" /></td>
+            </tr>
+            <tr>
+              <th>そのほか</th>
+              <td><input id="invoice-adjustment-10" type="number" step="1" value="0" /></td>
+              <td><input id="invoice-adjustment-8" type="number" step="1" value="0" /></td>
+              <td><input id="invoice-adjustment-0" type="number" step="1" value="0" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div class="invoice-totals" id="invoice-tax-breakdown">
         <!-- 税率ごとの内訳(税抜小計・消費税)をJSで生成 -->

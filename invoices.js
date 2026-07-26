@@ -7,7 +7,8 @@ const invoiceForm = document.getElementById("invoice-form");
 const invoiceFieldCustomer = document.getElementById("invoice-field-customer");
 const invoiceFieldIssueDate = document.getElementById("invoice-field-issue-date");
 const invoiceFieldDueDate = document.getElementById("invoice-field-due-date");
-const invoiceFieldDiscount = document.getElementById("invoice-field-discount");
+const invoiceDiscountInputs = { 10: document.getElementById("invoice-discount-10"), 8: document.getElementById("invoice-discount-8"), 0: document.getElementById("invoice-discount-0") };
+const invoiceAdjustmentInputs = { 10: document.getElementById("invoice-adjustment-10"), 8: document.getElementById("invoice-adjustment-8"), 0: document.getElementById("invoice-adjustment-0") };
 const invoiceFieldNotes = document.getElementById("invoice-field-notes");
 const invoiceItemsTbody = document.getElementById("invoice-items-tbody");
 const addInvoiceItemBtn = document.getElementById("add-invoice-item-btn");
@@ -29,32 +30,85 @@ let invoices = [];
 let invoicesLoaded = false;
 let companySettings = null;
 
+function invoiceRateKey(rate) {
+  if (rate === 0.08) return "8";
+  if (rate === 0) return "0";
+  return "10";
+}
+const INVOICE_RATE_VALUES = { 10: 0.10, 8: 0.08, 0: 0 };
+
 // --- 税率ごとに一括で消費税を計算(行ごとには計算しない) ---
 // 税率区分ごとの税抜合計に対して1回だけ端数処理する(インボイス制度の計算方法)。
-// 値引きは税率区分ごとの税抜金額の比率で按分してから税額計算する。
-function computeInvoiceTotals(items, discountInput = 0) {
+// 値引き・そのほか調整は税率区分ごとに直接入力された金額をそのまま反映する(按分しない)。
+function computeInvoiceTotals(items, adjustments = {}) {
   const groups = new Map();
   for (const it of items) {
     const rate = Number(it.tax_rate);
     const lineExcl = Number(it.quantity) * Number(it.unit_price);
     groups.set(rate, (groups.get(rate) || 0) + lineExcl);
   }
-  const rawSubtotal = [...groups.values()].reduce((sum, v) => sum + v, 0);
-  const discount = Math.max(0, Math.min(Number(discountInput) || 0, rawSubtotal));
 
   let subtotalExcl = 0;
   let totalTax = 0;
-  const breakdown = [...groups.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([rate, rawAmount]) => {
-      const share = rawSubtotal > 0 ? rawAmount / rawSubtotal : 0;
-      const taxableAmount = rawAmount - discount * share;
-      const tax = Math.floor(taxableAmount * rate);
-      subtotalExcl += taxableAmount;
-      totalTax += tax;
-      return { rate, taxableAmount, tax };
-    });
-  return { breakdown, subtotalExcl, totalTax, grandTotal: subtotalExcl + totalTax, discount, rawSubtotal };
+  const breakdown = [];
+  for (const key of ["10", "8", "0"]) {
+    const rate = INVOICE_RATE_VALUES[key];
+    const rawAmount = groups.get(rate) || 0;
+    const discount = Number(adjustments[`discount${key}`] || 0);
+    const other = Number(adjustments[`other${key}`] || 0);
+    if (rawAmount === 0 && discount === 0 && other === 0) continue;
+
+    const taxableAmount = rawAmount - discount + other;
+    const tax = Math.floor(taxableAmount * rate);
+    subtotalExcl += taxableAmount;
+    totalTax += tax;
+    breakdown.push({ rate, rawAmount, discount, other, taxableAmount, tax });
+  }
+  return { breakdown, subtotalExcl, totalTax, grandTotal: subtotalExcl + totalTax };
+}
+
+function adjustmentsFromInvoiceRow(inv) {
+  return {
+    discount10: inv.discount_10 || 0,
+    discount8: inv.discount_8 || 0,
+    discount0: inv.discount_0 || 0,
+    other10: inv.adjustment_10 || 0,
+    other8: inv.adjustment_8 || 0,
+    other0: inv.adjustment_0 || 0,
+  };
+}
+
+function taxBreakdownTableHtml(totals) {
+  return `
+    <table class="print-tax-summary">
+      <thead><tr><th>税率区分</th><th>小計(税抜)</th><th>値引き</th><th>そのほか</th><th>税抜金額</th><th>消費税額</th></tr></thead>
+      <tbody>
+        ${totals.breakdown
+          .map(
+            (b) => `
+          <tr>
+            <td>${formatPercent(b.rate)}対象</td>
+            <td>${formatYen(b.rawAmount)}</td>
+            <td>${b.discount > 0 ? `-${formatYen(b.discount)}` : "-"}</td>
+            <td>${b.other !== 0 ? formatYen(b.other) : "-"}</td>
+            <td>${formatYen(b.taxableAmount)}</td>
+            <td>${formatYen(b.tax)}</td>
+          </tr>`
+          )
+          .join("")}
+        <tr><th>合計</th><th>${formatYen(totals.breakdown.reduce((s, b) => s + b.rawAmount, 0))}</th><th></th><th></th><th>${formatYen(totals.subtotalExcl)}</th><th>${formatYen(totals.totalTax)}</th></tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function readInvoiceAdjustmentsFromDom() {
+  const adjustments = {};
+  for (const key of ["10", "8", "0"]) {
+    adjustments[`discount${key}`] = Number(invoiceDiscountInputs[key].value) || 0;
+    adjustments[`other${key}`] = Number(invoiceAdjustmentInputs[key].value) || 0;
+  }
+  return adjustments;
 }
 
 // --- 請求書一覧 ---
@@ -66,7 +120,7 @@ function renderInvoices() {
   }
   invoicesTbody.innerHTML = invoices
     .map((inv) => {
-      const totals = computeInvoiceTotals(inv.invoice_items || [], inv.discount_amount || 0);
+      const totals = computeInvoiceTotals(inv.invoice_items || [], adjustmentsFromInvoiceRow(inv));
       const customerName = inv.customer?.name || "-";
       const editable = inv.status === "issued" || inv.status === "paid";
       return `
@@ -195,7 +249,9 @@ invoiceItemsTbody.addEventListener("change", (e) => {
   recalcInvoiceTotals();
 });
 invoiceItemsTbody.addEventListener("input", recalcInvoiceTotals);
-invoiceFieldDiscount.addEventListener("input", recalcInvoiceTotals);
+[...Object.values(invoiceDiscountInputs), ...Object.values(invoiceAdjustmentInputs)].forEach((el) =>
+  el.addEventListener("input", recalcInvoiceTotals)
+);
 
 invoiceItemsTbody.addEventListener("click", (e) => {
   const btn = e.target.closest(".remove-item-btn");
@@ -222,7 +278,7 @@ function recalcInvoiceTotals() {
     tr.querySelector(".item-subtotal").textContent = formatYen(item.quantity * item.unit_price);
   });
 
-  const totals = computeInvoiceTotals(items.filter((i) => i.product_id), invoiceFieldDiscount.value);
+  const totals = computeInvoiceTotals(items.filter((i) => i.product_id), readInvoiceAdjustmentsFromDom());
   invoiceSubtotalEl.textContent = formatYen(totals.subtotalExcl);
   invoiceTaxEl.textContent = formatYen(totals.totalTax);
   invoiceTotalEl.textContent = formatYen(totals.grandTotal);
@@ -247,7 +303,10 @@ async function openInvoiceDialog(invoice = null) {
     invoiceFieldCustomer.value = invoice.customer_id || "";
     invoiceFieldIssueDate.value = invoice.issue_date;
     invoiceFieldDueDate.value = invoice.due_date || "";
-    invoiceFieldDiscount.value = invoice.discount_amount || 0;
+    for (const key of ["10", "8", "0"]) {
+      invoiceDiscountInputs[key].value = invoice[`discount_${key}`] || 0;
+      invoiceAdjustmentInputs[key].value = invoice[`adjustment_${key}`] || 0;
+    }
     invoiceFieldNotes.value = invoice.notes || "";
 
     const { data: items, error } = await supabaseClient
@@ -269,7 +328,10 @@ async function openInvoiceDialog(invoice = null) {
     document.getElementById("invoice-id").value = "";
     invoiceFieldIssueDate.value = todayStr();
     invoiceFieldDueDate.value = "";
-    invoiceFieldDiscount.value = 0;
+    for (const key of ["10", "8", "0"]) {
+      invoiceDiscountInputs[key].value = 0;
+      invoiceAdjustmentInputs[key].value = 0;
+    }
     addInvoiceItemRow();
   }
 
@@ -290,7 +352,17 @@ function customerNameById(id) {
   return customers.find((c) => c.id === id)?.name || "";
 }
 
-function buildInvoicePreviewHtml({ isEdit, invoiceNumberLabel, customerName, issueDate, dueDate, notes, items, totals }) {
+function companyInfoHtml(s) {
+  return `
+    <div>
+      <p><strong>${escapeHtml(s.company_name || "")}</strong></p>
+      <p>${escapeHtml(s.postal_code || "")} ${escapeHtml(s.address || "")}</p>
+      <p>${escapeHtml(s.phone || "")}</p>
+      ${s.invoice_registration_number ? `<p>登録番号: ${escapeHtml(s.invoice_registration_number)}</p>` : ""}
+    </div>`;
+}
+
+function buildInvoicePreviewHtml({ isEdit, invoiceNumberLabel, customerName, issueDate, dueDate, notes, items, totals, companyInfo }) {
   return `
     <div class="print-actions">
       <button type="button" class="btn" id="invoice-preview-back-btn">✏️ 内容を修正する</button>
@@ -302,6 +374,7 @@ function buildInvoicePreviewHtml({ isEdit, invoiceNumberLabel, customerName, iss
         <p>${escapeHtml(invoiceNumberLabel)}</p>
         <p>発行日: ${escapeHtml(issueDate)}${dueDate ? ` / 支払期限: ${escapeHtml(dueDate)}` : ""}</p>
       </div>
+      ${companyInfoHtml(companyInfo)}
     </div>
     <p><strong>${escapeHtml(customerName)}</strong> 様</p>
     <table>
@@ -321,22 +394,13 @@ function buildInvoicePreviewHtml({ isEdit, invoiceNumberLabel, customerName, iss
           .join("")}
       </tbody>
     </table>
-    <table class="print-tax-summary">
-      <thead><tr><th>税率区分</th><th>税抜金額</th><th>消費税額</th></tr></thead>
-      <tbody>
-        ${totals.breakdown
-          .map((b) => `<tr><td>${formatPercent(b.rate)}対象</td><td>${formatYen(b.taxableAmount)}</td><td>${formatYen(b.tax)}</td></tr>`)
-          .join("")}
-      </tbody>
-    </table>
-    ${totals.discount > 0 ? `<p>値引き(税抜): -${formatYen(totals.discount)}</p>` : ""}
-    <p>税抜合計(値引き後): ${formatYen(totals.subtotalExcl)} / 消費税合計: ${formatYen(totals.totalTax)}</p>
+    ${taxBreakdownTableHtml(totals)}
     <p style="font-size:1.2rem;"><strong>ご請求金額(税込合計): ${formatYen(totals.grandTotal)}</strong></p>
     ${notes ? `<p>【備考】<br>${escapeHtml(notes).replace(/\n/g, "<br>")}</p>` : ""}
   `;
 }
 
-invoiceForm.addEventListener("submit", (e) => {
+invoiceForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!invoiceFieldCustomer.value) {
     showToast("販売先を選択してください", true);
@@ -357,8 +421,8 @@ invoiceForm.addEventListener("submit", (e) => {
   const invoiceId = document.getElementById("invoice-id").value || null;
   const isEdit = !!invoiceId;
   const existingInvoice = isEdit ? invoices.find((i) => i.id === invoiceId) : null;
-  const discount = Number(invoiceFieldDiscount.value) || 0;
-  const totals = computeInvoiceTotals(items, discount);
+  const adjustments = readInvoiceAdjustmentsFromDom();
+  const totals = computeInvoiceTotals(items, adjustments);
 
   const pendingSubmit = {
     invoiceId,
@@ -367,9 +431,11 @@ invoiceForm.addEventListener("submit", (e) => {
     issueDate: invoiceFieldIssueDate.value || null,
     dueDate: invoiceFieldDueDate.value || null,
     notes: invoiceFieldNotes.value.trim() || null,
-    discount,
+    adjustments,
     items,
   };
+
+  if (!companySettings) await loadCompanySettings();
 
   const html = buildInvoicePreviewHtml({
     isEdit,
@@ -380,6 +446,7 @@ invoiceForm.addEventListener("submit", (e) => {
     notes: pendingSubmit.notes,
     items,
     totals,
+    companyInfo: companySettings || {},
   });
 
   // <dialog> はブラウザのトップレイヤーに描画されるため、開いたままではプレビューの
@@ -398,6 +465,21 @@ invoiceForm.addEventListener("submit", (e) => {
 
 async function confirmInvoiceSubmit(pending) {
   const rpcName = pending.isEdit ? "update_invoice" : "create_invoice";
+  const itemsPayload = pending.items.map((i, idx) => ({
+    product_id: i.product_id,
+    quantity: i.quantity,
+    unit_price: i.unit_price,
+    tax_rate: i.tax_rate,
+    sort_order: idx,
+  }));
+  const adjustmentParams = {
+    p_discount_10: pending.adjustments.discount10,
+    p_discount_8: pending.adjustments.discount8,
+    p_discount_0: pending.adjustments.discount0,
+    p_adjustment_10: pending.adjustments.other10,
+    p_adjustment_8: pending.adjustments.other8,
+    p_adjustment_0: pending.adjustments.other0,
+  };
   const params = pending.isEdit
     ? {
         p_invoice_id: pending.invoiceId,
@@ -405,28 +487,16 @@ async function confirmInvoiceSubmit(pending) {
         p_issue_date: pending.issueDate,
         p_due_date: pending.dueDate,
         p_notes: pending.notes,
-        p_items: pending.items.map((i, idx) => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          tax_rate: i.tax_rate,
-          sort_order: idx,
-        })),
-        p_discount_amount: pending.discount,
+        p_items: itemsPayload,
+        ...adjustmentParams,
       }
     : {
         p_customer_id: pending.customerId,
         p_issue_date: pending.issueDate,
         p_due_date: pending.dueDate,
         p_notes: pending.notes,
-        p_items: pending.items.map((i, idx) => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          tax_rate: i.tax_rate,
-          sort_order: idx,
-        })),
-        p_discount_amount: pending.discount,
+        p_items: itemsPayload,
+        ...adjustmentParams,
       };
 
   const { data, error } = await supabaseClient.rpc(rpcName, params);
@@ -509,7 +579,7 @@ async function openInvoicePrintView(invoice) {
   const s = companySettings || {};
 
   const items = [...fullInvoice.invoice_items].sort((a, b) => a.sort_order - b.sort_order);
-  const totals = computeInvoiceTotals(items, fullInvoice.discount_amount || 0);
+  const totals = computeInvoiceTotals(items, adjustmentsFromInvoiceRow(fullInvoice));
 
   invoicePrintView.innerHTML = `
     <div class="print-actions">
@@ -522,12 +592,7 @@ async function openInvoicePrintView(invoice) {
         <p>請求書番号: ${escapeHtml(fullInvoice.invoice_number)}</p>
         <p>発行日: ${escapeHtml(fullInvoice.issue_date)}${fullInvoice.due_date ? ` / 支払期限: ${escapeHtml(fullInvoice.due_date)}` : ""}</p>
       </div>
-      <div>
-        <p><strong>${escapeHtml(s.company_name || "")}</strong></p>
-        <p>${escapeHtml(s.postal_code || "")} ${escapeHtml(s.address || "")}</p>
-        <p>${escapeHtml(s.phone || "")}</p>
-        ${s.invoice_registration_number ? `<p>登録番号: ${escapeHtml(s.invoice_registration_number)}</p>` : ""}
-      </div>
+      ${companyInfoHtml(s)}
     </div>
 
     <p><strong>${escapeHtml(fullInvoice.customer?.name || "")}</strong> 様</p>
@@ -552,19 +617,8 @@ async function openInvoicePrintView(invoice) {
       </tbody>
     </table>
 
-    <table class="print-tax-summary">
-      <thead><tr><th>税率区分</th><th>税抜金額</th><th>消費税額</th></tr></thead>
-      <tbody>
-        ${totals.breakdown
-          .map(
-            (b) => `<tr><td>${formatPercent(b.rate)}対象</td><td>${formatYen(b.taxableAmount)}</td><td>${formatYen(b.tax)}</td></tr>`
-          )
-          .join("")}
-        <tr><th>合計</th><th>${formatYen(totals.subtotalExcl)}</th><th>${formatYen(totals.totalTax)}</th></tr>
-      </tbody>
-    </table>
+    ${taxBreakdownTableHtml(totals)}
 
-    ${totals.discount > 0 ? `<p>値引き(税抜): -${formatYen(totals.discount)}</p>` : ""}
     <p style="font-size:1.2rem;"><strong>ご請求金額(税込合計): ${formatYen(totals.grandTotal)}</strong></p>
 
     ${s.bank_info ? `<p>【お振込先】<br>${escapeHtml(s.bank_info).replace(/\n/g, "<br>")}</p>` : ""}

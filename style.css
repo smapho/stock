@@ -418,7 +418,10 @@ dialog input, dialog select, dialog textarea {
 }
 
 /* --- 請求書フォーム --- */
-#invoice-dialog, #customer-dialog, #company-settings-dialog {
+#invoice-dialog {
+  width: min(680px, 96vw);
+}
+#customer-dialog, #company-settings-dialog {
   width: min(560px, 94vw);
 }
 
@@ -435,6 +438,7 @@ dialog input, dialog select, dialog textarea {
 
 .invoice-items-wrap table {
   min-width: 0;
+  table-layout: fixed;
 }
 .invoice-items-wrap th, .invoice-items-wrap td {
   padding: 6px 8px;
@@ -443,6 +447,26 @@ dialog input, dialog select, dialog textarea {
 .invoice-items-wrap select, .invoice-items-wrap input {
   width: 100%;
   padding: 6px 8px;
+  box-sizing: border-box;
+}
+.invoice-items-wrap .col-item-name { width: 34%; }
+.invoice-items-wrap .col-item-qty { width: 8%; }
+.invoice-items-wrap .col-item-price { width: 18%; }
+.invoice-items-wrap .col-item-rate { width: 16%; }
+.invoice-items-wrap .col-item-subtotal { width: 16%; }
+.invoice-items-wrap .col-item-remove { width: 8%; }
+
+.adjustments-table {
+  min-width: 0;
+}
+.adjustments-table th, .adjustments-table td {
+  padding: 6px 8px;
+  font-size: 0.82rem;
+}
+.adjustments-table input {
+  width: 100%;
+  padding: 6px 8px;
+  box-sizing: border-box;
 }
 
 .invoice-totals {
@@ -502,6 +526,10 @@ dialog input, dialog select, dialog textarea {
 }
 .print-tax-summary th:first-child, .print-tax-summary td:first-child {
   text-align: left;
+}
+
+@page {
+  margin: 2cm;
 }
 
 @media print {
