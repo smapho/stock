@@ -145,13 +145,28 @@ expiryForm.addEventListener("submit", async (event) => {
     showToast("必須項目を正しく入力してください", true);
     return;
   }
+
+  let productNameWasCorrected = false;
+  try {
+    const registered = await findProductByBarcode(payload.barcode, products);
+    if (registered.name && registered.name !== payload.product_name) {
+      payload.product_name = registered.name;
+      expiryProductName.value = registered.name;
+      productNameWasCorrected = true;
+    }
+  } catch (error) {
+    // 商品名照合が一時的に失敗しても、品出し登録自体は止めない。
+  }
+
   const query = id
     ? supabaseClient.from("expiry_items").update(payload).eq("id", id)
     : supabaseClient.from("expiry_items").insert(payload);
   const { error } = await query;
   if (error) { showToast(`保存エラー: ${error.message}`, true); return; }
   expiryDialog.close();
-  showToast("品出し情報を保存しました");
+  showToast(productNameWasCorrected
+    ? `登録済みの商品名「${payload.product_name}」に修正して保存しました`
+    : "品出し情報を保存しました");
   await loadExpiryItems();
 });
 
