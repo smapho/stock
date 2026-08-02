@@ -12,6 +12,7 @@ let expiryItems = [];
 let expiryLookupTimer = null;
 let expiryLookupSequence = 0;
 let expiryScanControls = null;
+let expiryScanHintTimer = null;
 
 function localDateFromIso(value) {
   const [year, month, day] = value.split("-").map(Number);
@@ -180,6 +181,7 @@ expiryTbody.addEventListener("click", (event) => {
 const expiryScanDialog = document.getElementById("expiry-scan-dialog");
 const expiryScanStatus = document.getElementById("expiry-scan-status");
 function stopExpiryScan() {
+  clearTimeout(expiryScanHintTimer);
   if (expiryScanControls) { expiryScanControls.stop(); expiryScanControls = null; }
 }
 async function startExpiryScan() {
@@ -187,10 +189,19 @@ async function startExpiryScan() {
   expiryScanStatus.textContent = "カメラを起動しています…";
   if (typeof ZXingBrowser === "undefined") { expiryScanStatus.textContent = "読取ライブラリを読み込めませんでした"; return; }
   try {
-    const reader = new ZXingBrowser.BrowserMultiFormatReader();
+    const Reader = ZXingBrowser.BrowserMultiFormatOneDReader || ZXingBrowser.BrowserMultiFormatReader;
+    const reader = new Reader();
     expiryScanStatus.textContent = "バーコードにカメラを向けてください";
     expiryScanControls = await reader.decodeFromConstraints(
-      { audio: false, video: { facingMode: { ideal: "environment" } } },
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          focusMode: "continuous",
+        },
+      },
       document.getElementById("expiry-scan-video"),
       (result) => {
         if (!result) return;
@@ -201,6 +212,9 @@ async function startExpiryScan() {
         lookupProductName(code);
       }
     );
+    expiryScanHintTimer = setTimeout(() => {
+      expiryScanStatus.textContent = "読み取り中… バーコード全体を枠内に入れ、少し離して合わせてください";
+    }, 6000);
   } catch (error) { expiryScanStatus.textContent = `カメラを起動できませんでした: ${error.message}`; }
 }
 document.getElementById("expiry-scan-btn").addEventListener("click", startExpiryScan);

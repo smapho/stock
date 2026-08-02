@@ -523,8 +523,10 @@ const scanBarcodeBtn = document.getElementById("scan-barcode-btn");
 const cancelScanBtn = document.getElementById("cancel-scan-btn");
 
 let scanControls = null;
+let scanHintTimer = null;
 
 function stopScan() {
+  clearTimeout(scanHintTimer);
   if (scanControls) {
     scanControls.stop();
     scanControls = null;
@@ -556,12 +558,21 @@ async function startScan() {
   }
 
   try {
-    const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+    const Reader = ZXingBrowser.BrowserMultiFormatOneDReader || ZXingBrowser.BrowserMultiFormatReader;
+    const codeReader = new Reader();
     scanStatus.textContent = "バーコードにカメラを向けてください";
     // facingMode を直接指定(iOS Safari は権限取得前 enumerateDevices のラベルが空になり
     // 背面カメラの判定ができないため、deviceId ではなく constraints で直接要求する)
     scanControls = await codeReader.decodeFromConstraints(
-      { audio: false, video: { facingMode: { ideal: "environment" } } },
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          focusMode: "continuous",
+        },
+      },
       scanVideo,
       (result, err) => {
         if (result) {
@@ -569,6 +580,9 @@ async function startScan() {
         }
       }
     );
+    scanHintTimer = setTimeout(() => {
+      scanStatus.textContent = "読み取り中… バーコード全体を枠内に入れ、少し離して合わせてください";
+    }, 6000);
   } catch (err) {
     scanStatus.textContent = `カメラを起動できませんでした: ${err.message}`;
   }
