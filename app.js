@@ -14,7 +14,6 @@ const fieldPrice = document.getElementById("field-price");
 const fieldPriceIncludesTax = document.getElementById("field-price-includes-tax");
 const fieldTaxRate = document.getElementById("field-tax-rate");
 const fieldPricePreview = document.getElementById("field-price-preview");
-const productExpirySection = document.getElementById("product-expiry-section");
 const fieldExpiryDate = document.getElementById("field-expiry-date");
 const fieldExpiryLocation = document.getElementById("field-expiry-location");
 
@@ -332,7 +331,6 @@ function openProductDialog(product = null) {
   document.getElementById("field-low-threshold").value = 0;
   fieldPriceIncludesTax.value = "false";
   fieldTaxRate.value = "0.10";
-  productExpirySection.hidden = !!product;
 
   if (product) {
     productDialogTitle.textContent = "商品を編集";
@@ -369,7 +367,7 @@ productForm.addEventListener("submit", async (e) => {
   const id = document.getElementById("product-id").value;
   const expiryDate = fieldExpiryDate.value;
   const expiryLocation = fieldExpiryLocation.value.trim();
-  const shouldRegisterExpiry = !id && !!(expiryDate || expiryLocation);
+  const shouldRegisterExpiry = !!(expiryDate || expiryLocation);
   const payload = {
     name: document.getElementById("field-name").value.trim(),
     barcode: normalizeBarcode(document.getElementById("field-barcode").value) || null,

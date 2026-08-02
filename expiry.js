@@ -40,16 +40,60 @@ function matchesExpiryPeriod(days, period) {
   return true;
 }
 
+function normalizeExpirySearchToken(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[ァ-ヶ]/g, (character) => String.fromCharCode(character.charCodeAt(0) - 0x60))
+    .replace(/[^\p{L}\p{N}ー]/gu, "");
+}
+
+function fuzzyTextIncludes(value, normalizedTerm) {
+  const normalizedValue = normalizeExpirySearchToken(value);
+  if (!normalizedTerm) return true;
+  if (normalizedValue.includes(normalizedTerm)) return true;
+  if (normalizedTerm.length < 3) return false;
+
+  const allowedDistance = Math.min(3, Math.max(1, Math.floor(normalizedTerm.length / 4)));
+  const minLength = Math.max(1, normalizedTerm.length - allowedDistance);
+  const maxLength = Math.min(normalizedValue.length, normalizedTerm.length + allowedDistance);
+  for (let length = minLength; length <= maxLength; length += 1) {
+    for (let start = 0; start + length <= normalizedValue.length; start += 1) {
+      const candidate = normalizedValue.slice(start, start + length);
+      if (levenshteinDistance(candidate, normalizedTerm) <= allowedDistance) return true;
+    }
+  }
+  return false;
+}
+
+function matchesExpirySearch(item, searchValue) {
+  const tokens = String(searchValue || "")
+    .normalize("NFKC")
+    .trim()
+    .split(/\s+/)
+    .map(normalizeExpirySearchToken)
+    .filter(Boolean);
+  if (!tokens.length) return true;
+
+  const barcode = String(item.barcode || "").replace(/\D/g, "");
+  return tokens.every((token) => {
+    if (/^\d+$/.test(token)) {
+      return barcode.includes(token) ||
+        normalizeExpirySearchToken(item.product_name).includes(token) ||
+        normalizeExpirySearchToken(item.location).includes(token);
+    }
+    return fuzzyTextIncludes(item.product_name, token) || fuzzyTextIncludes(item.location, token);
+  });
+}
+
 function getFilteredExpiryItems() {
-  const term = expirySearchInput.value.trim().toLowerCase();
+  const term = expirySearchInput.value;
   const period = expiryPeriodFilter.value;
   return expiryItems
     .map((item) => ({ ...item, days: daysUntil(item.expires_on) }))
     .filter((item) => {
       if (!matchesExpiryPeriod(item.days, period)) return false;
-      if (!term) return true;
-      return [item.product_name, item.barcode, item.location]
-        .some((value) => (value || "").toLowerCase().includes(term));
+      return matchesExpirySearch(item, term);
     });
 }
 

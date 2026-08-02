@@ -68,7 +68,7 @@
     <!-- ============ 賞味期限タブ ============ -->
     <section class="tab-panel" data-tab-panel="expiry" hidden>
       <div class="panel-toolbar">
-        <input id="expiry-search-input" type="search" placeholder="商品名・バーコード・置き場所で検索" />
+        <input id="expiry-search-input" type="search" placeholder="商品名・JAN・置き場所を曖昧検索" />
         <select id="expiry-period-filter">
           <option value="all">すべての期限</option>
           <option value="today">当日</option>
@@ -242,7 +242,7 @@
       </label>
       <section id="product-expiry-section" class="product-expiry-section">
         <h3>賞味期限管理（任意）</h3>
-        <p>両方入力すると、商品と同時に賞味期限一覧へ登録します。</p>
+        <p>両方入力すると、賞味期限一覧へ追加登録します。</p>
         <div class="field-row">
           <label>賞味期限
             <input id="field-expiry-date" type="date" />
@@ -627,8 +627,8 @@
   <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260802k"></script>
-  <script src="app.js?v=20260802o"></script>
-  <script src="expiry.js?v=20260802m"></script>
+  <script src="app.js?v=20260802p"></script>
+  <script src="expiry.js?v=20260802n"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>
