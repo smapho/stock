@@ -96,8 +96,8 @@
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>期限</th><th>商品名</th><th>バーコード</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
-          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="6">読み込み中…</td></tr></tbody>
+          <thead><tr><th>期限</th><th>商品名</th><th>SKU</th><th>JAN</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
+          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="7">読み込み中…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -396,6 +396,9 @@
       <label>商品名 <span class="required">*</span>
         <input id="expiry-field-product-name" type="text" required />
       </label>
+      <label>SKU（JANから自動照合）
+        <input id="expiry-field-sku" type="text" readonly placeholder="未登録" />
+      </label>
       <div class="field-row">
         <label>賞味期限 <span class="required">*</span>
           <input id="expiry-field-date" type="date" required />
@@ -605,8 +608,8 @@
   <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260802h"></script>
-  <script src="app.js?v=20260802h"></script>
-  <script src="expiry.js?v=20260802h"></script>
+  <script src="app.js?v=20260802i"></script>
+  <script src="expiry.js?v=20260802i"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>

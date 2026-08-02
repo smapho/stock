@@ -420,7 +420,11 @@ let movementProduct = null;
 function openMovementDialog(product) {
   movementProduct = product;
   movementForm.reset();
-  document.getElementById("movement-product-name").textContent = `${product.name}(現在庫: ${product.quantity} ${product.unit || ""})`;
+  const codes = [
+    product.sku ? `SKU: ${product.sku}` : null,
+    product.barcode ? `JAN: ${product.barcode}` : null,
+  ].filter(Boolean).join(" / ");
+  document.getElementById("movement-product-name").textContent = `${product.name}${codes ? `（${codes}）` : ""}（現在庫: ${product.quantity} ${product.unit || ""}）`;
   movementType.value = "in";
   document.getElementById("movement-quantity").value = 1;
   updateMovementQtyLabel();
