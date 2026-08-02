@@ -3,7 +3,6 @@ const expiryDialog = document.getElementById("expiry-item-dialog");
 const expiryForm = document.getElementById("expiry-item-form");
 const expiryBarcode = document.getElementById("expiry-field-barcode");
 const expiryProductName = document.getElementById("expiry-field-product-name");
-const expirySku = document.getElementById("expiry-field-sku");
 const expiryLookupStatus = document.getElementById("expiry-lookup-status");
 const expiryPeriodFilter = document.getElementById("expiry-period-filter");
 const expirySearchInput = document.getElementById("expiry-search-input");
@@ -50,17 +49,15 @@ function renderExpiryItems() {
   });
 
   if (!filtered.length) {
-    expiryTbody.innerHTML = `<tr class="empty-row"><td colspan="7">${expiryItems.length ? "該当する商品がありません" : "品出し登録がまだありません"}</td></tr>`;
+    expiryTbody.innerHTML = `<tr class="empty-row"><td colspan="6">${expiryItems.length ? "該当する商品がありません" : "品出し登録がまだありません"}</td></tr>`;
     return;
   }
 
   expiryTbody.innerHTML = filtered.map((item) => {
     const state = item.days < 0 ? "expired" : item.days <= 7 ? "soon" : "";
-    const product = products.find((candidate) => normalizeBarcode(candidate.barcode) === normalizeBarcode(item.barcode));
     return `<tr class="${state ? `expiry-${state}` : ""}">
       <td class="expiry-date ${state}">${escapeHtml(item.expires_on)}<span class="expiry-days">${expiryLabel(item.days)}</span></td>
       <td>${escapeHtml(item.product_name)}</td>
-      <td>${escapeHtml(product?.sku || "-")}</td>
       <td>${escapeHtml(item.barcode)}</td>
       <td>${escapeHtml(item.location)}</td>
       <td>${item.quantity}</td>
@@ -93,12 +90,10 @@ async function lookupProductName(barcode) {
     if (sequence !== expiryLookupSequence) return;
     if (result.name) {
       expiryProductName.value = result.name;
-      expirySku.value = result.product?.sku || "";
       expiryLookupStatus.textContent = result.source === "local"
         ? "登録済みの商品から商品名を取得しました"
         : "商品データベースから商品名を取得しました";
     } else {
-      expirySku.value = "";
       expiryLookupStatus.textContent = "商品名が見つかりません。手入力してください";
       expiryProductName.focus();
     }
@@ -114,10 +109,6 @@ function openExpiryDialog(item = null) {
   document.getElementById("expiry-item-id").value = item?.id || "";
   expiryBarcode.value = item?.barcode || "";
   expiryProductName.value = item?.product_name || "";
-  const product = item
-    ? products.find((candidate) => normalizeBarcode(candidate.barcode) === normalizeBarcode(item.barcode))
-    : null;
-  expirySku.value = product?.sku || "";
   document.getElementById("expiry-field-date").value = item?.expires_on || "";
   document.getElementById("expiry-field-location").value = item?.location || "";
   document.getElementById("expiry-field-quantity").value = item?.quantity || 1;
@@ -135,7 +126,6 @@ expiryPeriodFilter.addEventListener("change", renderExpiryItems);
 
 expiryBarcode.addEventListener("input", () => {
   clearTimeout(expiryLookupTimer);
-  expirySku.value = "";
   expiryLookupTimer = setTimeout(() => lookupProductName(expiryBarcode.value), 450);
 });
 expiryBarcode.addEventListener("change", () => lookupProductName(expiryBarcode.value));
@@ -153,6 +143,11 @@ expiryForm.addEventListener("submit", async (event) => {
   };
   if (!payload.barcode || !payload.product_name || !payload.expires_on || !payload.location || payload.quantity < 1) {
     showToast("必須項目を正しく入力してください", true);
+    return;
+  }
+  if (!isValidGtin(payload.barcode)) {
+    showToast("JANには正しい8・12・13・14桁のバーコード番号を入力してください", true);
+    expiryBarcode.focus();
     return;
   }
 
@@ -216,6 +211,10 @@ async function startExpiryScan() {
       (result) => {
         if (!result) return;
         const code = result.getText();
+        if (!isValidGtin(code)) {
+          expiryScanStatus.textContent = "QRコードは対象外です。数字のバーコードを枠内に入れてください";
+          return;
+        }
         stopExpiryScan();
         expiryScanDialog.close();
         expiryBarcode.value = code;

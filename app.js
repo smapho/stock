@@ -245,7 +245,6 @@ function renderProducts() {
     if (!term) return true;
     return (
       p.name.toLowerCase().includes(term) ||
-      (p.sku || "").toLowerCase().includes(term) ||
       (p.barcode || "").toLowerCase().includes(term)
     );
   });
@@ -256,7 +255,7 @@ function renderProducts() {
   ).length;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${
       products.length === 0 ? "商品がまだありません" : "該当する商品がありません"
     }</td></tr>`;
     return;
@@ -270,7 +269,6 @@ function renderProducts() {
       return `
         <tr class="${isLow ? "low-stock" : ""}" data-id="${p.id}">
           <td>${escapeHtml(p.name)}</td>
-          <td>${escapeHtml(p.sku || "-")}</td>
           <td>${escapeHtml(p.barcode || "-")}</td>
           <td>${escapeHtml(brandName)}</td>
           <td>${escapeHtml(categoryName)}</td>
@@ -333,7 +331,6 @@ function openProductDialog(product = null) {
     productDialogTitle.textContent = "商品を編集";
     document.getElementById("product-id").value = product.id;
     document.getElementById("field-name").value = product.name;
-    document.getElementById("field-sku").value = product.sku || "";
     document.getElementById("field-barcode").value = product.barcode || "";
     fieldBrand.value = product.brand_id || "";
     fieldCategory.value = product.category_id || "";
@@ -365,7 +362,6 @@ productForm.addEventListener("submit", async (e) => {
   const id = document.getElementById("product-id").value;
   const payload = {
     name: document.getElementById("field-name").value.trim(),
-    sku: document.getElementById("field-sku").value.trim() || null,
     barcode: normalizeBarcode(document.getElementById("field-barcode").value) || null,
     brand_id: fieldBrand.value || null,
     category_id: fieldCategory.value || null,
@@ -381,6 +377,11 @@ productForm.addEventListener("submit", async (e) => {
 
   if (!payload.name) {
     showToast("商品名を入力してください", true);
+    return;
+  }
+  if (payload.barcode && !isValidGtin(payload.barcode)) {
+    showToast("JANには正しい8・12・13・14桁のバーコード番号を入力してください", true);
+    document.getElementById("field-barcode").focus();
     return;
   }
 
@@ -420,10 +421,7 @@ let movementProduct = null;
 function openMovementDialog(product) {
   movementProduct = product;
   movementForm.reset();
-  const codes = [
-    product.sku ? `SKU: ${product.sku}` : null,
-    product.barcode ? `JAN: ${product.barcode}` : null,
-  ].filter(Boolean).join(" / ");
+  const codes = product.barcode ? `JAN: ${product.barcode}` : "";
   document.getElementById("movement-product-name").textContent = `${product.name}${codes ? `（${codes}）` : ""}（現在庫: ${product.quantity} ${product.unit || ""}）`;
   movementType.value = "in";
   document.getElementById("movement-quantity").value = 1;
@@ -542,6 +540,11 @@ function stopScan() {
 }
 
 async function handleScannedCode(code) {
+  if (!isValidGtin(code)) {
+    scanStatus.textContent = "QRコードは対象外です。数字のバーコードを枠内に入れてください";
+    return;
+  }
+
   stopScan();
   scanDialog.close();
 

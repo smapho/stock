@@ -26,7 +26,7 @@
     <!-- ============ 在庫タブ ============ -->
     <section class="tab-panel" data-tab-panel="inventory">
       <div class="panel-toolbar">
-        <input id="search-input" type="search" placeholder="商品名・SKU・JANで検索" />
+        <input id="search-input" type="search" placeholder="商品名・JANで検索" />
         <select id="brand-filter"><option value="">全ブランド</option></select>
         <select id="category-filter"><option value="">全カテゴリ</option></select>
         <button id="scan-barcode-btn" class="btn">📷 バーコードでスキャン</button>
@@ -49,7 +49,6 @@
           <thead>
             <tr>
               <th>商品名</th>
-              <th>SKU</th>
               <th>JAN</th>
               <th>ブランド</th>
               <th>カテゴリ</th>
@@ -60,7 +59,7 @@
             </tr>
           </thead>
           <tbody id="products-tbody">
-            <tr class="empty-row"><td colspan="9">読み込み中…</td></tr>
+            <tr class="empty-row"><td colspan="8">読み込み中…</td></tr>
           </tbody>
         </table>
       </div>
@@ -96,8 +95,8 @@
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>期限</th><th>商品名</th><th>SKU</th><th>JAN</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
-          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="7">読み込み中…</td></tr></tbody>
+          <thead><tr><th>期限</th><th>商品名</th><th>JAN</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
+          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="6">読み込み中…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -235,9 +234,6 @@
 
       <label>商品名 <span class="required">*</span>
         <input id="field-name" type="text" required />
-      </label>
-      <label>SKU（店舗管理コード・任意）
-        <input id="field-sku" type="text" />
       </label>
       <label>JAN（バーコード）
         <input id="field-barcode" type="text" inputmode="numeric" autocomplete="off" />
@@ -395,9 +391,6 @@
       <p id="expiry-lookup-status" class="field-help"></p>
       <label>商品名 <span class="required">*</span>
         <input id="expiry-field-product-name" type="text" required />
-      </label>
-      <label>SKU（JANから自動照合）
-        <input id="expiry-field-sku" type="text" readonly placeholder="未登録" />
       </label>
       <div class="field-row">
         <label>賞味期限 <span class="required">*</span>
@@ -607,9 +600,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
-  <script src="common.js?v=20260802h"></script>
-  <script src="app.js?v=20260802i"></script>
-  <script src="expiry.js?v=20260802i"></script>
+  <script src="common.js?v=20260802k"></script>
+  <script src="app.js?v=20260802k"></script>
+  <script src="expiry.js?v=20260802k"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>
