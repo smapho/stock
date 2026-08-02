@@ -16,6 +16,23 @@ const fieldTaxRate = document.getElementById("field-tax-rate");
 const fieldPricePreview = document.getElementById("field-price-preview");
 const fieldExpiryDate = document.getElementById("field-expiry-date");
 const fieldExpiryLocation = document.getElementById("field-expiry-location");
+const productSpecsDetails = document.getElementById("product-specs-details");
+const productSpecFieldIds = {
+  model: "field-spec-model",
+  cpu: "field-spec-cpu",
+  memory: "field-spec-memory",
+  gpu: "field-spec-gpu",
+  storageType: "field-spec-storage-type",
+  storageCapacity: "field-spec-storage-capacity",
+  os: "field-spec-os",
+  software: "field-spec-software",
+  monitorSize: "field-spec-monitor-size",
+  monitorResolution: "field-spec-monitor-resolution",
+  monitorConnectors: "field-spec-monitor-connectors",
+  network: "field-spec-network",
+  accessories: "field-spec-accessories",
+  other: "field-spec-other",
+};
 
 const movementDialog = document.getElementById("movement-dialog");
 const movementForm = document.getElementById("movement-form");
@@ -277,7 +294,7 @@ function renderProducts() {
           <td>${escapeHtml(p.barcode || "-")}</td>
           <td>${escapeHtml(brandName)}</td>
           <td>${escapeHtml(categoryName)}</td>
-          <td><span class="qty-badge ${isLow ? "low" : ""}">${p.quantity} ${escapeHtml(p.unit || "")}</span></td>
+          <td><button type="button" class="qty-badge inventory-detail-btn ${isLow ? "low" : ""}" data-id="${p.id}" title="棚別在庫の詳細を表示">${p.quantity} ${escapeHtml(p.unit || "")}</button></td>
           <td>${formatPriceCell(p)}</td>
           <td>${escapeHtml(p.purchased_at || "-")}</td>
           <td>
@@ -290,6 +307,7 @@ function renderProducts() {
       `;
     })
     .join("");
+  if (typeof refreshInventoryDetailButtons === "function") refreshInventoryDetailButtons();
 }
 
 async function loadProducts() {
@@ -324,6 +342,26 @@ function updatePricePreview() {
   el.addEventListener("input", updatePricePreview)
 );
 
+function readProductSpecs() {
+  return Object.fromEntries(Object.entries(productSpecFieldIds)
+    .map(([key, id]) => [key, document.getElementById(id).value.trim()])
+    .filter(([, value]) => value));
+}
+
+function setProductSpecs(specs = {}) {
+  Object.entries(productSpecFieldIds).forEach(([key, id]) => {
+    document.getElementById(id).value = specs?.[key] || "";
+  });
+  productSpecsDetails.open = productSpecEntries(specs).length > 0;
+}
+
+function openSpecsForEquipmentCategory() {
+  const categoryName = categories.find((category) => category.id === fieldCategory.value)?.name || "";
+  if (/^(PC|OA機器)$/i.test(categoryName)) productSpecsDetails.open = true;
+}
+
+fieldCategory.addEventListener("change", openSpecsForEquipmentCategory);
+
 function openProductDialog(product = null) {
   productForm.reset();
   document.getElementById("field-unit").value = "個";
@@ -331,6 +369,7 @@ function openProductDialog(product = null) {
   document.getElementById("field-low-threshold").value = 0;
   fieldPriceIncludesTax.value = "false";
   fieldTaxRate.value = "0.10";
+  setProductSpecs(product?.specs || {});
 
   if (product) {
     productDialogTitle.textContent = "商品を編集";
@@ -339,6 +378,7 @@ function openProductDialog(product = null) {
     document.getElementById("field-barcode").value = product.barcode || "";
     fieldBrand.value = product.brand_id || "";
     fieldCategory.value = product.category_id || "";
+    openSpecsForEquipmentCategory();
     document.getElementById("field-quantity").value = product.quantity;
     document.getElementById("field-unit").value = product.unit || "個";
     document.getElementById("field-low-threshold").value = product.low_stock_threshold;
@@ -381,6 +421,7 @@ productForm.addEventListener("submit", async (e) => {
     tax_rate: Number(fieldTaxRate.value),
     purchased_at: document.getElementById("field-purchased-at").value || null,
     notes: document.getElementById("field-notes").value.trim() || null,
+    specs: readProductSpecs(),
   };
 
   if (!payload.name) {

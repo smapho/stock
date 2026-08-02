@@ -80,6 +80,34 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const PRODUCT_SPEC_LABELS = {
+  model: "型番",
+  cpu: "CPU",
+  memory: "メモリ",
+  gpu: "GPU",
+  storageType: "ストレージ区分",
+  storageCapacity: "ストレージ容量",
+  os: "OS",
+  software: "ソフト",
+  monitorSize: "モニターサイズ",
+  monitorResolution: "モニター解像度",
+  monitorConnectors: "接続端子",
+  network: "ネットワーク",
+  accessories: "付属品",
+  other: "その他",
+};
+
+function productSpecEntries(specs) {
+  const source = specs && typeof specs === "object" ? specs : {};
+  return Object.entries(PRODUCT_SPEC_LABELS)
+    .map(([key, label]) => ({ key, label, value: String(source[key] || "").trim() }))
+    .filter((entry) => entry.value);
+}
+
+function formatProductSpecs(specs) {
+  return productSpecEntries(specs).map((entry) => `${entry.label}: ${entry.value}`).join(" / ");
+}
+
 // --- バーコード商品名検索 ---
 function normalizeBarcode(value) {
   const withoutPrefix = String(value || "").trim().replace(/^sku\s*:\s*/i, "");

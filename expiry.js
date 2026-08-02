@@ -7,6 +7,11 @@ const expiryLookupStatus = document.getElementById("expiry-lookup-status");
 const expiryPeriodFilter = document.getElementById("expiry-period-filter");
 const expirySearchInput = document.getElementById("expiry-search-input");
 const expiryExportBtn = document.getElementById("expiry-export-btn");
+const shelfInventoryCsvBtn = document.getElementById("shelf-inventory-csv-btn");
+const shelfInventoryPdfBtn = document.getElementById("shelf-inventory-pdf-btn");
+const shelfInventoryPrintView = document.getElementById("shelf-inventory-print-view");
+const inventoryDetailDialog = document.getElementById("inventory-detail-dialog");
+const inventoryDetailContent = document.getElementById("inventory-detail-content");
 const deleteExpiryItemBtn = document.getElementById("delete-expiry-item-btn");
 
 let expiryItems = [];
@@ -122,11 +127,83 @@ function buildExpiryExportRows(items) {
   );
 }
 
+function buildShelfInventoryRows(items) {
+  const grouped = new Map();
+  items.forEach((item) => {
+    const location = item.location || "棚未設定";
+    const key = [location, item.barcode, item.product_name].join("\u0000");
+    let row = grouped.get(key);
+    if (!row) {
+      row = {
+        location,
+        barcode: item.barcode || "",
+        productName: item.product_name || "",
+        quantity: 0,
+        expiryQuantities: new Map(),
+      };
+      grouped.set(key, row);
+    }
+    const quantity = Number(item.quantity) || 0;
+    row.quantity += quantity;
+    const expiry = item.expires_on || "期限なし";
+    row.expiryQuantities.set(expiry, (row.expiryQuantities.get(expiry) || 0) + quantity);
+  });
+
+  return [...grouped.values()]
+    .map((row) => ({
+      location: row.location,
+      barcode: row.barcode,
+      productName: row.productName,
+      quantity: row.quantity,
+      specSummary: formatProductSpecs(products.find((product) =>
+        normalizeBarcode(product.barcode) === normalizeBarcode(row.barcode))?.specs),
+      expiryDetails: [...row.expiryQuantities.entries()]
+        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+        .map(([date, quantity]) => `${date} (${quantity})`)
+        .join(" / "),
+    }))
+    .sort((a, b) =>
+      a.location.localeCompare(b.location, "ja", { numeric: true }) ||
+      a.productName.localeCompare(b.productName, "ja", { numeric: true }) ||
+      a.barcode.localeCompare(b.barcode)
+    );
+}
+
+async function loadShelfInventoryRows() {
+  const { data, error } = await supabaseClient
+    .from("expiry_items")
+    .select("barcode, product_name, expires_on, location, quantity");
+  if (error) {
+    showToast(`棚別在庫の読み込みエラー: ${error.message}`, true);
+    return null;
+  }
+  const rows = buildShelfInventoryRows(data || []);
+  if (!rows.length) {
+    showToast("棚と数量が登録された商品がありません", true);
+    return null;
+  }
+  return rows;
+}
+
 function escapeCsvValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   let text = String(value ?? "");
   // Excelで商品名や棚名が数式として実行されないようにする。
   if (/^[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsvFile(filename, rows) {
+  const csv = `\uFEFF${rows.map((row) => row.map(escapeCsvValue).join(",")).join("\r\n")}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function exportExpiryItems() {
@@ -141,17 +218,128 @@ function exportExpiryItems() {
     ["棚（置き場所）", "商品名", "在庫数", "期限"],
     ...rows.map((row) => [row.location, row.productName, row.quantity, row.expiresOn]),
   ];
-  const csv = `\uFEFF${csvRows.map((row) => row.map(escapeCsvValue).join(",")).join("\r\n")}`;
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `賞味期限一覧_${todayStr()}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadCsvFile(`賞味期限一覧_${todayStr()}.csv`, csvRows);
   showToast("棚ごとの賞味期限一覧を出力しました");
+}
+
+async function exportShelfInventoryCsv() {
+  const rows = await loadShelfInventoryRows();
+  if (!rows) return;
+  downloadCsvFile(`棚別商品在庫_${todayStr()}.csv`, [
+    ["棚（置き場所）", "商品名", "JAN", "在庫数", "仕様", "期限別内訳"],
+    ...rows.map((row) => [row.location, row.productName, row.barcode, row.quantity, row.specSummary, row.expiryDetails]),
+  ]);
+  showToast("棚別商品在庫データを出力しました");
+}
+
+function groupShelfInventoryRows(rows) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    if (!groups.has(row.location)) groups.set(row.location, []);
+    groups.get(row.location).push(row);
+  });
+  return [...groups.entries()];
+}
+
+function shelfRowsForProduct(product, items = expiryItems) {
+  const barcode = normalizeBarcode(product?.barcode);
+  if (!barcode) return [];
+  return buildShelfInventoryRows(items.filter((item) => normalizeBarcode(item.barcode) === barcode));
+}
+
+function refreshInventoryDetailButtons() {
+  document.querySelectorAll(".inventory-detail-btn").forEach((button) => {
+    const product = products.find((candidate) => candidate.id === button.dataset.id);
+    if (!product) return;
+    const rows = shelfRowsForProduct(product);
+    button.title = rows.length
+      ? rows.map((row) => `${row.location}: ${row.quantity}（${row.expiryDetails}）`).join("\n")
+      : "棚別在庫は未登録です。タップすると詳細を確認できます";
+  });
+}
+
+async function showInventoryShelfDetail(product) {
+  let rows = [];
+  if (product.barcode) {
+    const { data, error } = await supabaseClient
+      .from("expiry_items")
+      .select("barcode, product_name, expires_on, location, quantity")
+      .eq("barcode", product.barcode);
+    if (error) {
+      showToast(`棚別在庫の読み込みエラー: ${error.message}`, true);
+      return;
+    }
+    rows = buildShelfInventoryRows(data || []);
+  }
+
+  const shelfTotal = rows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalMatches = shelfTotal === Number(product.quantity);
+  inventoryDetailContent.innerHTML = `
+    <p class="inventory-detail-product"><strong>${escapeHtml(product.name)}</strong><br>JAN: ${escapeHtml(product.barcode || "未登録")}</p>
+    ${productSpecEntries(product.specs).length ? `
+      <dl class="inventory-detail-specs">${productSpecEntries(product.specs).map((entry) => `
+        <div><dt>${escapeHtml(entry.label)}</dt><dd>${escapeHtml(entry.value)}</dd></div>
+      `).join("")}</dl>
+    ` : ""}
+    <div class="inventory-detail-summary">
+      <span>商品在庫: <strong>${Number(product.quantity) || 0} ${escapeHtml(product.unit || "")}</strong></span>
+      <span>棚登録合計: <strong>${shelfTotal}</strong></span>
+    </div>
+    ${rows.length ? `
+      <div class="table-wrap"><table>
+        <thead><tr><th>棚（置き場所）</th><th>在庫数</th><th>期限別内訳</th></tr></thead>
+        <tbody>${rows.map((row) => `
+          <tr><td>${escapeHtml(row.location)}</td><td class="number-cell">${row.quantity}</td><td>${escapeHtml(row.expiryDetails)}</td></tr>
+        `).join("")}</tbody>
+      </table></div>
+      ${totalMatches ? "" : '<p class="inventory-detail-warning">商品在庫と棚登録合計が一致していません。入庫時の棚登録を確認してください。</p>'}
+    ` : '<p class="inventory-detail-empty">棚別在庫はまだ登録されていません。商品編集または入庫画面で賞味期限と置き場所を登録してください。</p>'}
+  `;
+  inventoryDetailDialog.showModal();
+}
+
+async function showShelfInventoryPdf() {
+  const rows = await loadShelfInventoryRows();
+  if (!rows) return;
+
+  const groups = groupShelfInventoryRows(rows);
+  const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
+  shelfInventoryPrintView.innerHTML = `
+    <div class="print-actions">
+      <button type="button" class="btn btn-primary" id="shelf-inventory-print-now-btn">🖨 印刷 / PDF保存</button>
+      <button type="button" class="btn" id="shelf-inventory-print-close-btn">閉じる</button>
+    </div>
+    <div class="print-header">
+      <h2>棚別商品在庫一覧</h2>
+      <div>出力日: ${escapeHtml(todayStr())}</div>
+    </div>
+    <div class="shelf-inventory-print-summary">
+      棚数: ${groups.length} / 商品行数: ${rows.length} / 在庫合計: ${totalQuantity}
+    </div>
+    ${groups.map(([location, shelfRows]) => {
+      const shelfTotal = shelfRows.reduce((sum, row) => sum + row.quantity, 0);
+      return `
+        <section class="shelf-inventory-print-section">
+          <h3>${escapeHtml(location)} <span>在庫合計 ${shelfTotal}</span></h3>
+          <table>
+            <thead><tr><th>商品名</th><th>JAN</th><th>在庫数</th><th>期限別内訳</th></tr></thead>
+            <tbody>${shelfRows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.productName)}${row.specSummary ? `<span class="shelf-product-specs">${escapeHtml(row.specSummary)}</span>` : ""}</td>
+                <td>${escapeHtml(row.barcode)}</td>
+                <td class="number-cell">${row.quantity}</td>
+                <td>${escapeHtml(row.expiryDetails)}</td>
+              </tr>`).join("")}</tbody>
+          </table>
+        </section>`;
+    }).join("")}
+  `;
+  shelfInventoryPrintView.hidden = false;
+  document.getElementById("shelf-inventory-print-now-btn").addEventListener("click", () => window.print());
+  document.getElementById("shelf-inventory-print-close-btn").addEventListener("click", () => {
+    shelfInventoryPrintView.hidden = true;
+    shelfInventoryPrintView.innerHTML = "";
+  });
 }
 
 function renderExpiryItems() {
@@ -190,6 +378,7 @@ async function loadExpiryItems() {
   }
   expiryItems = data || [];
   renderExpiryItems();
+  refreshInventoryDetailButtons();
 }
 
 async function lookupProductName(barcode) {
@@ -236,6 +425,15 @@ function openExpiryDialog(item = null) {
 
 document.getElementById("add-expiry-item-btn").addEventListener("click", () => openExpiryDialog());
 expiryExportBtn.addEventListener("click", exportExpiryItems);
+shelfInventoryCsvBtn.addEventListener("click", exportShelfInventoryCsv);
+shelfInventoryPdfBtn.addEventListener("click", showShelfInventoryPdf);
+document.getElementById("products-tbody").addEventListener("click", (event) => {
+  const button = event.target.closest(".inventory-detail-btn");
+  if (!button) return;
+  const product = products.find((candidate) => candidate.id === button.dataset.id);
+  if (product) showInventoryShelfDetail(product);
+});
+document.getElementById("close-inventory-detail-btn").addEventListener("click", () => inventoryDetailDialog.close());
 document.getElementById("cancel-expiry-item-btn").addEventListener("click", () => expiryDialog.close());
 expirySearchInput.addEventListener("input", renderExpiryItems);
 expiryPeriodFilter.addEventListener("change", renderExpiryItems);

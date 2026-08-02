@@ -200,6 +200,17 @@ tbody tr.low-stock {
   font-weight: 600;
 }
 
+button.qty-badge {
+  padding: 3px 5px;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .qty-badge.low {
   color: var(--color-warn-text);
 }
@@ -207,6 +218,64 @@ tbody tr.low-stock {
 .price-sub {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+#inventory-detail-dialog {
+  width: min(680px, 94vw);
+}
+
+.inventory-detail-product {
+  margin: 0;
+}
+
+.inventory-detail-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg));
+}
+
+.inventory-detail-specs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+}
+
+.inventory-detail-specs div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inventory-detail-specs dt {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.inventory-detail-specs dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.inventory-detail-content .number-cell,
+#inventory-detail-content .number-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.inventory-detail-warning {
+  color: var(--color-warn-text);
+  font-size: 0.82rem;
+}
+
+.inventory-detail-empty {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
 }
 
 .row-actions {
@@ -288,6 +357,9 @@ dialog label {
 }
 
 dialog input, dialog select, dialog textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -301,7 +373,10 @@ dialog input, dialog select, dialog textarea {
   display: flex;
   gap: 12px;
 }
-.field-row label { flex: 1; }
+.field-row label {
+  min-width: 0;
+  flex: 1;
+}
 
 .product-expiry-section {
   padding: 12px;
@@ -319,6 +394,34 @@ dialog input, dialog select, dialog textarea {
   margin: 0 0 10px;
   color: var(--color-text-muted);
   font-size: 0.78rem;
+}
+
+.product-specs-section {
+  padding: 10px 12px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.product-specs-section summary {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.product-specs-section[open] summary {
+  margin-bottom: 12px;
+}
+
+.product-specs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.product-specs-section > label + label {
+  margin-top: 10px;
 }
 
 .required { color: var(--color-danger); }
@@ -407,7 +510,11 @@ dialog input, dialog select, dialog textarea {
   display: flex;
   gap: 8px;
 }
-.field-with-action select { flex: 1; }
+.field-with-action select {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
 
 .price-preview {
   margin: -4px 0 0;
@@ -420,7 +527,11 @@ dialog input, dialog select, dialog textarea {
   display: flex;
   gap: 8px;
 }
-.inline-form input { flex: 1; }
+.inline-form input {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
 
 .simple-list {
   list-style: none;
@@ -573,6 +684,60 @@ dialog input, dialog select, dialog textarea {
 }
 .print-tax-summary th:first-child, .print-tax-summary td:first-child {
   text-align: left;
+}
+
+.shelf-inventory-print-summary {
+  margin: -12px 0 22px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.shelf-inventory-print-section {
+  margin: 0 0 24px;
+}
+
+.shelf-inventory-print-section h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 5px solid #2563eb;
+  background: #eff6ff;
+  font-size: 1rem;
+  break-after: avoid;
+}
+
+.shelf-inventory-print-section h3 span {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.shelf-inventory-print-section table {
+  margin-top: 0;
+}
+
+.shelf-inventory-print-section thead {
+  display: table-header-group;
+}
+
+.shelf-inventory-print-section .number-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.shelf-product-specs {
+  display: block;
+  margin-top: 3px;
+  color: #475569;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 600px) {
+  .product-specs-grid,
+  .inventory-detail-specs {
+    grid-template-columns: 1fr;
+  }
 }
 
 @page {
