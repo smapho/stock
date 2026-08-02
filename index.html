@@ -240,6 +240,18 @@
       <label>JAN（バーコード）
         <input id="field-barcode" type="text" inputmode="numeric" autocomplete="off" />
       </label>
+      <section id="product-expiry-section" class="product-expiry-section">
+        <h3>賞味期限管理（任意）</h3>
+        <p>両方入力すると、商品と同時に賞味期限一覧へ登録します。</p>
+        <div class="field-row">
+          <label>賞味期限
+            <input id="field-expiry-date" type="date" />
+          </label>
+          <label>置き場所
+            <input id="field-expiry-location" type="text" placeholder="例: 1番棚 上段" />
+          </label>
+        </div>
+      </section>
       <label>ブランド(メーカー)
         <span class="field-with-action">
           <select id="field-brand"><option value="">未設定</option></select>
@@ -260,18 +272,6 @@
           <input id="field-unit" type="text" value="個" />
         </label>
       </div>
-      <section id="product-expiry-section" class="product-expiry-section">
-        <h3>賞味期限管理（任意）</h3>
-        <p>両方入力すると、商品と同時に賞味期限一覧へ登録します。</p>
-        <div class="field-row">
-          <label>賞味期限
-            <input id="field-expiry-date" type="date" />
-          </label>
-          <label>置き場所
-            <input id="field-expiry-location" type="text" placeholder="例: 1番棚 上段" />
-          </label>
-        </div>
-      </section>
       <label>購入年月日
         <input id="field-purchased-at" type="date" />
       </label>
@@ -364,6 +364,18 @@
       <label id="movement-qty-label">数量
         <input id="movement-quantity" type="number" min="1" step="1" value="1" required />
       </label>
+      <section id="movement-expiry-section" class="product-expiry-section">
+        <h3>賞味期限管理（任意）</h3>
+        <p>両方入力すると、入庫数量を賞味期限一覧へ登録します。</p>
+        <div class="field-row">
+          <label>賞味期限
+            <input id="movement-expiry-date" type="date" />
+          </label>
+          <label>置き場所
+            <input id="movement-expiry-location" type="text" placeholder="例: 1番棚 上段" />
+          </label>
+        </div>
+      </section>
       <label>メモ
         <input id="movement-note" type="text" placeholder="任意" />
       </label>
@@ -615,7 +627,7 @@
   <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260802k"></script>
-  <script src="app.js?v=20260802n"></script>
+  <script src="app.js?v=20260802o"></script>
   <script src="expiry.js?v=20260802m"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>

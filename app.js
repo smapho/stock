@@ -22,6 +22,9 @@ const movementDialog = document.getElementById("movement-dialog");
 const movementForm = document.getElementById("movement-form");
 const movementType = document.getElementById("movement-type");
 const movementQtyLabel = document.getElementById("movement-qty-label");
+const movementExpirySection = document.getElementById("movement-expiry-section");
+const movementExpiryDate = document.getElementById("movement-expiry-date");
+const movementExpiryLocation = document.getElementById("movement-expiry-location");
 
 const categoryDialog = document.getElementById("category-dialog");
 const manageCategoriesBtn = document.getElementById("manage-categories-btn");
@@ -466,6 +469,7 @@ function openMovementDialog(product) {
   movementType.value = "in";
   document.getElementById("movement-quantity").value = 1;
   updateMovementQtyLabel();
+  updateMovementExpiryVisibility();
   movementDialog.showModal();
 }
 
@@ -473,7 +477,20 @@ function updateMovementQtyLabel() {
   movementQtyLabel.firstChild.textContent =
     movementType.value === "adjust" ? "調整後の数量" : "数量";
 }
-movementType.addEventListener("change", updateMovementQtyLabel);
+
+function updateMovementExpiryVisibility() {
+  const isInbound = movementType.value === "in";
+  movementExpirySection.hidden = !isInbound;
+  if (!isInbound) {
+    movementExpiryDate.value = "";
+    movementExpiryLocation.value = "";
+  }
+}
+
+movementType.addEventListener("change", () => {
+  updateMovementQtyLabel();
+  updateMovementExpiryVisibility();
+});
 
 document.getElementById("cancel-movement-btn").addEventListener("click", () => movementDialog.close());
 
@@ -483,9 +500,26 @@ movementForm.addEventListener("submit", async (e) => {
   const type = movementType.value;
   const qtyInput = Number(document.getElementById("movement-quantity").value);
   const note = document.getElementById("movement-note").value.trim() || null;
+  const expiryDate = movementExpiryDate.value;
+  const expiryLocation = movementExpiryLocation.value.trim();
+  const shouldRegisterExpiry = type === "in" && !!(expiryDate || expiryLocation);
 
   if (!Number.isFinite(qtyInput) || qtyInput < 0) {
     showToast("数量を正しく入力してください", true);
+    return;
+  }
+  if (shouldRegisterExpiry && (!expiryDate || !expiryLocation)) {
+    showToast("賞味期限を登録する場合は、賞味期限と置き場所の両方を入力してください", true);
+    (!expiryDate ? movementExpiryDate : movementExpiryLocation).focus();
+    return;
+  }
+  if (shouldRegisterExpiry && !movementProduct.barcode) {
+    showToast("賞味期限を登録するには商品へJANを登録してください", true);
+    return;
+  }
+  if (shouldRegisterExpiry && qtyInput < 1) {
+    showToast("賞味期限を登録する場合は入庫数量を1以上にしてください", true);
+    document.getElementById("movement-quantity").focus();
     return;
   }
 
@@ -528,7 +562,24 @@ movementForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  showToast("在庫を更新しました");
+  if (shouldRegisterExpiry) {
+    const { error: expiryError } = await supabaseClient.from("expiry_items").insert({
+      barcode: movementProduct.barcode,
+      product_name: movementProduct.name,
+      expires_on: expiryDate,
+      location: expiryLocation,
+      quantity: qtyInput,
+      notes: note,
+    });
+    if (expiryError) {
+      showToast(`在庫は更新しましたが、賞味期限を登録できませんでした: ${expiryError.message}`, true);
+      movementDialog.close();
+      await loadProducts();
+      return;
+    }
+  }
+
+  showToast(shouldRegisterExpiry ? "入庫と賞味期限を登録しました" : "在庫を更新しました");
   movementDialog.close();
   await loadProducts();
 });
