@@ -92,7 +92,7 @@ async function findProductByBarcode(value, existingProducts = []) {
   const code = normalizeBarcode(value);
   if (!code) return { code, name: null, source: null };
 
-  const localProduct = existingProducts.find((product) => normalizeBarcode(product.sku) === code);
+  const localProduct = existingProducts.find((product) => normalizeBarcode(product.barcode) === code);
   if (localProduct) return { code, name: localProduct.name, source: "local", product: localProduct };
 
   const response = await fetch(

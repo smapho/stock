@@ -245,7 +245,8 @@ function renderProducts() {
     if (!term) return true;
     return (
       p.name.toLowerCase().includes(term) ||
-      (p.sku || "").toLowerCase().includes(term)
+      (p.sku || "").toLowerCase().includes(term) ||
+      (p.barcode || "").toLowerCase().includes(term)
     );
   });
 
@@ -255,7 +256,7 @@ function renderProducts() {
   ).length;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${
       products.length === 0 ? "商品がまだありません" : "該当する商品がありません"
     }</td></tr>`;
     return;
@@ -270,6 +271,7 @@ function renderProducts() {
         <tr class="${isLow ? "low-stock" : ""}" data-id="${p.id}">
           <td>${escapeHtml(p.name)}</td>
           <td>${escapeHtml(p.sku || "-")}</td>
+          <td>${escapeHtml(p.barcode || "-")}</td>
           <td>${escapeHtml(brandName)}</td>
           <td>${escapeHtml(categoryName)}</td>
           <td><span class="qty-badge ${isLow ? "low" : ""}">${p.quantity} ${escapeHtml(p.unit || "")}</span></td>
@@ -332,6 +334,7 @@ function openProductDialog(product = null) {
     document.getElementById("product-id").value = product.id;
     document.getElementById("field-name").value = product.name;
     document.getElementById("field-sku").value = product.sku || "";
+    document.getElementById("field-barcode").value = product.barcode || "";
     fieldBrand.value = product.brand_id || "";
     fieldCategory.value = product.category_id || "";
     document.getElementById("field-quantity").value = product.quantity;
@@ -363,6 +366,7 @@ productForm.addEventListener("submit", async (e) => {
   const payload = {
     name: document.getElementById("field-name").value.trim(),
     sku: document.getElementById("field-sku").value.trim() || null,
+    barcode: normalizeBarcode(document.getElementById("field-barcode").value) || null,
     brand_id: fieldBrand.value || null,
     category_id: fieldCategory.value || null,
     quantity: Number(document.getElementById("field-quantity").value) || 0,
@@ -386,7 +390,7 @@ productForm.addEventListener("submit", async (e) => {
 
   const { error } = await query;
   if (error) {
-    showToast(`保存エラー: ${error.message}`, true);
+    showToast(error.code === "23505" ? "このJANコードは別の商品に登録済みです" : `保存エラー: ${error.message}`, true);
     return;
   }
   showToast("保存しました");
@@ -538,13 +542,13 @@ async function handleScannedCode(code) {
   scanDialog.close();
 
   const normalizedCode = normalizeBarcode(code);
-  const product = products.find((p) => normalizeBarcode(p.sku) === normalizedCode);
+  const product = products.find((p) => normalizeBarcode(p.barcode) === normalizedCode);
   if (product) {
     showToast(`スキャン: ${product.name}`);
     openMovementDialog(product);
   } else {
     openProductDialog();
-    document.getElementById("field-sku").value = normalizedCode;
+    document.getElementById("field-barcode").value = normalizedCode;
     showToast("商品名を検索しています…");
     try {
       const result = await findProductByBarcode(normalizedCode, products);
