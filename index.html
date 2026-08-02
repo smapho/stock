@@ -4,13 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>在庫管理</title>
-<link rel="stylesheet" href="style.css?v=20260727b" />
+<link rel="stylesheet" href="style.css?v=20260802a" />
 </head>
 <body>
   <header class="app-header">
     <h1>在庫管理</h1>
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="inventory">在庫</button>
+      <button class="tab-btn" data-tab="expiry">賞味期限</button>
       <button class="tab-btn" data-tab="customers">取引先</button>
       <button class="tab-btn" data-tab="invoices">請求書/出荷</button>
       <button class="tab-btn" data-tab="masters">マスタ</button>
@@ -60,6 +61,42 @@
           <tbody id="products-tbody">
             <tr class="empty-row"><td colspan="8">読み込み中…</td></tr>
           </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 賞味期限タブ ============ -->
+    <section class="tab-panel" data-tab-panel="expiry" hidden>
+      <div class="panel-toolbar">
+        <input id="expiry-search-input" type="search" placeholder="商品名・バーコード・置き場所で検索" />
+        <select id="expiry-period-filter">
+          <option value="all">すべての期限</option>
+          <option value="expired">期限切れ</option>
+          <option value="7">7日以内</option>
+          <option value="30">30日以内</option>
+        </select>
+        <button id="add-expiry-item-btn" class="btn btn-primary">📷 品出しを登録</button>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-card summary-card-danger">
+          <span class="summary-label">期限切れ</span>
+          <span class="summary-value" id="expiry-summary-expired">0</span>
+        </div>
+        <div class="summary-card summary-card-warn">
+          <span class="summary-label">7日以内</span>
+          <span class="summary-value" id="expiry-summary-soon">0</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">30日以内</span>
+          <span class="summary-value" id="expiry-summary-month">0</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>期限</th><th>商品名</th><th>バーコード</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
+          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="6">読み込み中…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -340,6 +377,56 @@
     </div>
   </dialog>
 
+  <!-- 品出し・賞味期限登録モーダル -->
+  <dialog id="expiry-item-dialog">
+    <form id="expiry-item-form" method="dialog">
+      <h2>品出しを登録</h2>
+      <input type="hidden" id="expiry-item-id" />
+      <label>バーコード <span class="required">*</span>
+        <span class="field-with-action">
+          <input id="expiry-field-barcode" type="text" inputmode="numeric" autocomplete="off" required />
+          <button type="button" id="expiry-scan-btn" class="btn btn-sm">📷 読取</button>
+        </span>
+      </label>
+      <p id="expiry-lookup-status" class="field-help"></p>
+      <label>商品名 <span class="required">*</span>
+        <input id="expiry-field-product-name" type="text" required />
+      </label>
+      <div class="field-row">
+        <label>賞味期限 <span class="required">*</span>
+          <input id="expiry-field-date" type="date" required />
+        </label>
+        <label>数量
+          <input id="expiry-field-quantity" type="number" min="1" step="1" value="1" required />
+        </label>
+      </div>
+      <label>置き場所 <span class="required">*</span>
+        <input id="expiry-field-location" type="text" placeholder="例: 1番棚 上段" required />
+      </label>
+      <label>メモ
+        <input id="expiry-field-notes" type="text" />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="delete-expiry-item-btn" class="btn btn-danger" hidden>削除</button>
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-expiry-item-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="expiry-scan-dialog">
+    <div class="scan-body">
+      <h2>品出し商品のバーコード</h2>
+      <video id="expiry-scan-video" muted playsinline></video>
+      <p id="expiry-scan-status" class="scan-status">カメラを起動しています…</p>
+      <div class="dialog-actions"><div class="dialog-actions-right">
+        <button type="button" id="cancel-expiry-scan-btn" class="btn">閉じる</button>
+      </div></div>
+    </div>
+  </dialog>
+
   <!-- 取引先追加・編集モーダル -->
   <dialog id="customer-dialog">
     <form id="customer-form" method="dialog">
@@ -515,6 +602,7 @@
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260727b"></script>
   <script src="app.js?v=20260727b"></script>
+  <script src="expiry.js?v=20260802a"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>
