@@ -6,6 +6,7 @@ const expiryProductName = document.getElementById("expiry-field-product-name");
 const expiryLookupStatus = document.getElementById("expiry-lookup-status");
 const expiryPeriodFilter = document.getElementById("expiry-period-filter");
 const expirySearchInput = document.getElementById("expiry-search-input");
+const expiryExportBtn = document.getElementById("expiry-export-btn");
 const deleteExpiryItemBtn = document.getElementById("delete-expiry-item-btn");
 
 let expiryItems = [];
@@ -29,6 +30,62 @@ function expiryLabel(days) {
   if (days < 0) return `${Math.abs(days)}日超過`;
   if (days === 0) return "本日まで";
   return `あと${days}日`;
+}
+
+function buildExpiryExportRows(items) {
+  const grouped = new Map();
+  items.forEach((item) => {
+    // 同じ棚・商品・期限で分かれて登録された在庫は1行に合計する。
+    const key = [item.location, item.barcode, item.product_name, item.expires_on].join("\u0000");
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.quantity += Number(item.quantity) || 0;
+    } else {
+      grouped.set(key, {
+        location: item.location || "",
+        productName: item.product_name || "",
+        quantity: Number(item.quantity) || 0,
+        expiresOn: item.expires_on || "",
+      });
+    }
+  });
+
+  return [...grouped.values()].sort((a, b) =>
+    a.location.localeCompare(b.location, "ja", { numeric: true }) ||
+    a.productName.localeCompare(b.productName, "ja", { numeric: true }) ||
+    a.expiresOn.localeCompare(b.expiresOn)
+  );
+}
+
+function escapeCsvValue(value) {
+  let text = String(value ?? "");
+  // Excelで商品名や棚名が数式として実行されないようにする。
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function exportExpiryItems() {
+  if (!expiryItems.length) {
+    showToast("出力できる賞味期限商品がありません", true);
+    return;
+  }
+
+  const rows = buildExpiryExportRows(expiryItems);
+  const csvRows = [
+    ["棚（置き場所）", "商品名", "在庫数", "期限"],
+    ...rows.map((row) => [row.location, row.productName, row.quantity, row.expiresOn]),
+  ];
+  const csv = `\uFEFF${csvRows.map((row) => row.map(escapeCsvValue).join(",")).join("\r\n")}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `賞味期限一覧_${todayStr()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("棚ごとの賞味期限一覧を出力しました");
 }
 
 function renderExpiryItems() {
@@ -120,6 +177,7 @@ function openExpiryDialog(item = null) {
 }
 
 document.getElementById("add-expiry-item-btn").addEventListener("click", () => openExpiryDialog());
+expiryExportBtn.addEventListener("click", exportExpiryItems);
 document.getElementById("cancel-expiry-item-btn").addEventListener("click", () => expiryDialog.close());
 expirySearchInput.addEventListener("input", renderExpiryItems);
 expiryPeriodFilter.addEventListener("change", renderExpiryItems);
