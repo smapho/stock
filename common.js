@@ -80,6 +80,30 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// --- バーコード商品名検索 ---
+function normalizeBarcode(value) {
+  const withoutPrefix = String(value || "").trim().replace(/^sku\s*:\s*/i, "");
+  return /^[\d\s-]+$/.test(withoutPrefix)
+    ? withoutPrefix.replace(/[^\d]/g, "")
+    : withoutPrefix;
+}
+
+async function findProductByBarcode(value, existingProducts = []) {
+  const code = normalizeBarcode(value);
+  if (!code) return { code, name: null, source: null };
+
+  const localProduct = existingProducts.find((product) => normalizeBarcode(product.sku) === code);
+  if (localProduct) return { code, name: localProduct.name, source: "local", product: localProduct };
+
+  const response = await fetch(
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_ja`
+  );
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const result = await response.json();
+  const name = result.product?.product_name_ja || result.product?.product_name || null;
+  return { code, name: result.status === 1 ? name : null, source: name ? "openfoodfacts" : null };
+}
+
 // --- タブ切り替え ---
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {

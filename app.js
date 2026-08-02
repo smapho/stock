@@ -537,14 +537,28 @@ async function handleScannedCode(code) {
   stopScan();
   scanDialog.close();
 
-  const product = products.find((p) => (p.sku || "").trim() === code.trim());
+  const normalizedCode = normalizeBarcode(code);
+  const product = products.find((p) => normalizeBarcode(p.sku) === normalizedCode);
   if (product) {
     showToast(`スキャン: ${product.name}`);
     openMovementDialog(product);
   } else {
-    showToast("未登録のバーコードです。商品名を入力してください", true);
     openProductDialog();
-    document.getElementById("field-sku").value = code;
+    document.getElementById("field-sku").value = normalizedCode;
+    showToast("商品名を検索しています…");
+    try {
+      const result = await findProductByBarcode(normalizedCode, products);
+      if (result.name) {
+        document.getElementById("field-name").value = result.name;
+        showToast(`商品名を取得しました: ${result.name}`);
+      } else {
+        showToast("商品名が見つかりません。手入力してください", true);
+        document.getElementById("field-name").focus();
+      }
+    } catch (error) {
+      showToast("商品名を取得できませんでした。手入力してください", true);
+      document.getElementById("field-name").focus();
+    }
   }
 }
 
@@ -558,21 +572,12 @@ async function startScan() {
   }
 
   try {
-    const Reader = ZXingBrowser.BrowserMultiFormatOneDReader || ZXingBrowser.BrowserMultiFormatReader;
-    const codeReader = new Reader();
+    const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
     scanStatus.textContent = "バーコードにカメラを向けてください";
     // facingMode を直接指定(iOS Safari は権限取得前 enumerateDevices のラベルが空になり
     // 背面カメラの判定ができないため、deviceId ではなく constraints で直接要求する)
     scanControls = await codeReader.decodeFromConstraints(
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          focusMode: "continuous",
-        },
-      },
+      { audio: false, video: { facingMode: { ideal: "environment" } } },
       scanVideo,
       (result, err) => {
         if (result) {

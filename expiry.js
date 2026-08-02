@@ -78,27 +78,21 @@ async function loadExpiryItems() {
 }
 
 async function lookupProductName(barcode) {
-  const code = barcode.trim();
+  const code = normalizeBarcode(barcode);
   const sequence = ++expiryLookupSequence;
   if (!code) { expiryLookupStatus.textContent = ""; return; }
 
-  const localProduct = products.find((p) => (p.sku || "").trim() === code);
-  if (localProduct) {
-    expiryProductName.value = localProduct.name;
-    expiryLookupStatus.textContent = "登録済みの商品から商品名を取得しました";
-    return;
-  }
+  expiryBarcode.value = code;
 
   expiryLookupStatus.textContent = "商品名を検索しています…";
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_ja`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.json();
+    const result = await findProductByBarcode(code, products);
     if (sequence !== expiryLookupSequence) return;
-    const name = result.product?.product_name_ja || result.product?.product_name;
-    if (result.status === 1 && name) {
-      expiryProductName.value = name;
-      expiryLookupStatus.textContent = "商品データベースから商品名を取得しました";
+    if (result.name) {
+      expiryProductName.value = result.name;
+      expiryLookupStatus.textContent = result.source === "local"
+        ? "登録済みの商品から商品名を取得しました"
+        : "商品データベースから商品名を取得しました";
     } else {
       expiryLookupStatus.textContent = "商品名が見つかりません。手入力してください";
       expiryProductName.focus();
@@ -189,19 +183,10 @@ async function startExpiryScan() {
   expiryScanStatus.textContent = "カメラを起動しています…";
   if (typeof ZXingBrowser === "undefined") { expiryScanStatus.textContent = "読取ライブラリを読み込めませんでした"; return; }
   try {
-    const Reader = ZXingBrowser.BrowserMultiFormatOneDReader || ZXingBrowser.BrowserMultiFormatReader;
-    const reader = new Reader();
+    const reader = new ZXingBrowser.BrowserMultiFormatReader();
     expiryScanStatus.textContent = "バーコードにカメラを向けてください";
     expiryScanControls = await reader.decodeFromConstraints(
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          focusMode: "continuous",
-        },
-      },
+      { audio: false, video: { facingMode: { ideal: "environment" } } },
       document.getElementById("expiry-scan-video"),
       (result) => {
         if (!result) return;
