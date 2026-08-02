@@ -14,6 +14,9 @@ const fieldPrice = document.getElementById("field-price");
 const fieldPriceIncludesTax = document.getElementById("field-price-includes-tax");
 const fieldTaxRate = document.getElementById("field-tax-rate");
 const fieldPricePreview = document.getElementById("field-price-preview");
+const productExpirySection = document.getElementById("product-expiry-section");
+const fieldExpiryDate = document.getElementById("field-expiry-date");
+const fieldExpiryLocation = document.getElementById("field-expiry-location");
 
 const movementDialog = document.getElementById("movement-dialog");
 const movementForm = document.getElementById("movement-form");
@@ -326,6 +329,7 @@ function openProductDialog(product = null) {
   document.getElementById("field-low-threshold").value = 0;
   fieldPriceIncludesTax.value = "false";
   fieldTaxRate.value = "0.10";
+  productExpirySection.hidden = !!product;
 
   if (product) {
     productDialogTitle.textContent = "商品を編集";
@@ -360,6 +364,9 @@ document.getElementById("cancel-dialog-btn").addEventListener("click", () => pro
 productForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("product-id").value;
+  const expiryDate = fieldExpiryDate.value;
+  const expiryLocation = fieldExpiryLocation.value.trim();
+  const shouldRegisterExpiry = !id && !!(expiryDate || expiryLocation);
   const payload = {
     name: document.getElementById("field-name").value.trim(),
     barcode: normalizeBarcode(document.getElementById("field-barcode").value) || null,
@@ -384,6 +391,21 @@ productForm.addEventListener("submit", async (e) => {
     document.getElementById("field-barcode").focus();
     return;
   }
+  if (shouldRegisterExpiry && (!expiryDate || !expiryLocation)) {
+    showToast("賞味期限を登録する場合は、賞味期限と置き場所の両方を入力してください", true);
+    (!expiryDate ? fieldExpiryDate : fieldExpiryLocation).focus();
+    return;
+  }
+  if (shouldRegisterExpiry && !payload.barcode) {
+    showToast("賞味期限を登録する場合はJANを入力してください", true);
+    document.getElementById("field-barcode").focus();
+    return;
+  }
+  if (shouldRegisterExpiry && payload.quantity < 1) {
+    showToast("賞味期限を登録する場合は数量を1以上にしてください", true);
+    document.getElementById("field-quantity").focus();
+    return;
+  }
 
   const query = id
     ? supabaseClient.from("products").update(payload).eq("id", id)
@@ -394,7 +416,25 @@ productForm.addEventListener("submit", async (e) => {
     showToast(error.code === "23505" ? "このJANコードは別の商品に登録済みです" : `保存エラー: ${error.message}`, true);
     return;
   }
-  showToast("保存しました");
+
+  if (shouldRegisterExpiry) {
+    const { error: expiryError } = await supabaseClient.from("expiry_items").insert({
+      barcode: payload.barcode,
+      product_name: payload.name,
+      expires_on: expiryDate,
+      location: expiryLocation,
+      quantity: payload.quantity,
+      notes: null,
+    });
+    if (expiryError) {
+      showToast(`商品は保存しましたが、賞味期限を登録できませんでした: ${expiryError.message}`, true);
+      productDialog.close();
+      await loadProducts();
+      return;
+    }
+  }
+
+  showToast(shouldRegisterExpiry ? "商品と賞味期限を保存しました" : "保存しました");
   productDialog.close();
   await loadProducts();
 });

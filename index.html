@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>在庫管理</title>
-<link rel="stylesheet" href="style.css?v=20260802a" />
+<link rel="stylesheet" href="style.css?v=20260802b" />
 </head>
 <body>
   <header class="app-header">
@@ -260,6 +260,18 @@
           <input id="field-unit" type="text" value="個" />
         </label>
       </div>
+      <section id="product-expiry-section" class="product-expiry-section">
+        <h3>賞味期限管理（任意）</h3>
+        <p>両方入力すると、商品と同時に賞味期限一覧へ登録します。</p>
+        <div class="field-row">
+          <label>賞味期限
+            <input id="field-expiry-date" type="date" />
+          </label>
+          <label>置き場所
+            <input id="field-expiry-location" type="text" placeholder="例: 1番棚 上段" />
+          </label>
+        </div>
+      </section>
       <label>購入年月日
         <input id="field-purchased-at" type="date" />
       </label>
@@ -603,7 +615,7 @@
   <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260802k"></script>
-  <script src="app.js?v=20260802k"></script>
+  <script src="app.js?v=20260802n"></script>
   <script src="expiry.js?v=20260802m"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
