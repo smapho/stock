@@ -71,9 +71,10 @@
         <input id="expiry-search-input" type="search" placeholder="商品名・バーコード・置き場所で検索" />
         <select id="expiry-period-filter">
           <option value="all">すべての期限</option>
-          <option value="expired">期限切れ</option>
+          <option value="today">当日</option>
           <option value="7">7日以内</option>
-          <option value="30">30日以内</option>
+          <option value="31">31日以内</option>
+          <option value="expired">すでに期限切れ</option>
         </select>
         <button id="expiry-export-btn" class="btn">⬇️ 一覧出力</button>
         <button id="add-expiry-item-btn" class="btn btn-primary">📷 品出しを登録</button>
@@ -89,7 +90,7 @@
           <span class="summary-value" id="expiry-summary-soon">0</span>
         </div>
         <div class="summary-card">
-          <span class="summary-label">30日以内</span>
+          <span class="summary-label">31日以内</span>
           <span class="summary-value" id="expiry-summary-month">0</span>
         </div>
       </div>
@@ -603,7 +604,7 @@
   <script src="config.js?v=20260727b"></script>
   <script src="common.js?v=20260802k"></script>
   <script src="app.js?v=20260802k"></script>
-  <script src="expiry.js?v=20260802l"></script>
+  <script src="expiry.js?v=20260802m"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>

@@ -32,6 +32,27 @@ function expiryLabel(days) {
   return `あと${days}日`;
 }
 
+function matchesExpiryPeriod(days, period) {
+  if (period === "today") return days === 0;
+  if (period === "7") return days >= 0 && days <= 7;
+  if (period === "31") return days >= 0 && days <= 31;
+  if (period === "expired") return days < 0;
+  return true;
+}
+
+function getFilteredExpiryItems() {
+  const term = expirySearchInput.value.trim().toLowerCase();
+  const period = expiryPeriodFilter.value;
+  return expiryItems
+    .map((item) => ({ ...item, days: daysUntil(item.expires_on) }))
+    .filter((item) => {
+      if (!matchesExpiryPeriod(item.days, period)) return false;
+      if (!term) return true;
+      return [item.product_name, item.barcode, item.location]
+        .some((value) => (value || "").toLowerCase().includes(term));
+    });
+}
+
 function buildExpiryExportRows(items) {
   const grouped = new Map();
   items.forEach((item) => {
@@ -65,12 +86,13 @@ function escapeCsvValue(value) {
 }
 
 function exportExpiryItems() {
-  if (!expiryItems.length) {
-    showToast("出力できる賞味期限商品がありません", true);
+  const filteredItems = getFilteredExpiryItems();
+  if (!filteredItems.length) {
+    showToast("選択中の条件に該当する商品がありません", true);
     return;
   }
 
-  const rows = buildExpiryExportRows(expiryItems);
+  const rows = buildExpiryExportRows(filteredItems);
   const csvRows = [
     ["棚（置き場所）", "商品名", "在庫数", "期限"],
     ...rows.map((row) => [row.location, row.productName, row.quantity, row.expiresOn]),
@@ -89,21 +111,13 @@ function exportExpiryItems() {
 }
 
 function renderExpiryItems() {
-  const term = expirySearchInput.value.trim().toLowerCase();
-  const period = expiryPeriodFilter.value;
   const withDays = expiryItems.map((item) => ({ ...item, days: daysUntil(item.expires_on) }));
 
   document.getElementById("expiry-summary-expired").textContent = withDays.filter((i) => i.days < 0).length;
   document.getElementById("expiry-summary-soon").textContent = withDays.filter((i) => i.days >= 0 && i.days <= 7).length;
-  document.getElementById("expiry-summary-month").textContent = withDays.filter((i) => i.days >= 0 && i.days <= 30).length;
+  document.getElementById("expiry-summary-month").textContent = withDays.filter((i) => i.days >= 0 && i.days <= 31).length;
 
-  const filtered = withDays.filter((item) => {
-    if (period === "expired" && item.days >= 0) return false;
-    if (period === "7" && (item.days < 0 || item.days > 7)) return false;
-    if (period === "30" && (item.days < 0 || item.days > 30)) return false;
-    if (!term) return true;
-    return [item.product_name, item.barcode, item.location].some((v) => (v || "").toLowerCase().includes(term));
-  });
+  const filtered = getFilteredExpiryItems();
 
   if (!filtered.length) {
     expiryTbody.innerHTML = `<tr class="empty-row"><td colspan="6">${expiryItems.length ? "該当する商品がありません" : "品出し登録がまだありません"}</td></tr>`;
