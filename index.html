@@ -4,13 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>在庫管理</title>
-<link rel="stylesheet" href="style.css?v=20260727b" />
+<link rel="stylesheet" href="style.css?v=20260802d" />
 </head>
 <body>
   <header class="app-header">
     <h1>在庫管理</h1>
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="inventory">在庫</button>
+      <button class="tab-btn" data-tab="expiry">賞味期限</button>
       <button class="tab-btn" data-tab="customers">取引先</button>
       <button class="tab-btn" data-tab="invoices">請求書/出荷</button>
       <button class="tab-btn" data-tab="masters">マスタ</button>
@@ -25,9 +26,11 @@
     <!-- ============ 在庫タブ ============ -->
     <section class="tab-panel" data-tab-panel="inventory">
       <div class="panel-toolbar">
-        <input id="search-input" type="search" placeholder="商品名・SKUで検索" />
+        <input id="search-input" type="search" placeholder="商品名・JANで検索" />
         <select id="brand-filter"><option value="">全ブランド</option></select>
         <select id="category-filter"><option value="">全カテゴリ</option></select>
+        <button id="shelf-inventory-csv-btn" class="btn">⬇️ 棚別在庫データ</button>
+        <button id="shelf-inventory-pdf-btn" class="btn">🖨 棚別在庫PDF</button>
         <button id="scan-barcode-btn" class="btn">📷 バーコードでスキャン</button>
         <button id="add-product-btn" class="btn btn-primary">＋ 商品を追加</button>
       </div>
@@ -48,7 +51,7 @@
           <thead>
             <tr>
               <th>商品名</th>
-              <th>SKU</th>
+              <th>JAN</th>
               <th>ブランド</th>
               <th>カテゴリ</th>
               <th>数量</th>
@@ -60,6 +63,44 @@
           <tbody id="products-tbody">
             <tr class="empty-row"><td colspan="8">読み込み中…</td></tr>
           </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 賞味期限タブ ============ -->
+    <section class="tab-panel" data-tab-panel="expiry" hidden>
+      <div class="panel-toolbar">
+        <input id="expiry-search-input" type="search" placeholder="商品名・JAN・置き場所を曖昧検索" />
+        <select id="expiry-period-filter">
+          <option value="all">すべての期限</option>
+          <option value="today">当日</option>
+          <option value="7">7日以内</option>
+          <option value="31">31日以内</option>
+          <option value="expired">すでに期限切れ</option>
+        </select>
+        <button id="expiry-export-btn" class="btn">⬇️ 一覧出力</button>
+        <button id="add-expiry-item-btn" class="btn btn-primary">📷 品出しを登録</button>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-card summary-card-danger">
+          <span class="summary-label">期限切れ</span>
+          <span class="summary-value" id="expiry-summary-expired">0</span>
+        </div>
+        <div class="summary-card summary-card-warn">
+          <span class="summary-label">7日以内</span>
+          <span class="summary-value" id="expiry-summary-soon">0</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">31日以内</span>
+          <span class="summary-value" id="expiry-summary-month">0</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>期限</th><th>商品名</th><th>JAN</th><th>置き場所</th><th>数量</th><th></th></tr></thead>
+          <tbody id="expiry-items-tbody"><tr class="empty-row"><td colspan="6">読み込み中…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -198,21 +239,87 @@
       <label>商品名 <span class="required">*</span>
         <input id="field-name" type="text" required />
       </label>
-      <label>SKU
-        <input id="field-sku" type="text" />
+      <label>JAN（バーコード）
+        <input id="field-barcode" type="text" inputmode="numeric" autocomplete="off" />
       </label>
+      <section id="product-expiry-section" class="product-expiry-section">
+        <h3>賞味期限管理（任意）</h3>
+        <p>両方入力すると、賞味期限一覧へ追加登録します。</p>
+        <div class="field-row">
+          <label>賞味期限
+            <input id="field-expiry-date" type="date" />
+          </label>
+          <label>置き場所
+            <input id="field-expiry-location" type="text" placeholder="例: 1番棚 上段" />
+          </label>
+        </div>
+      </section>
       <label>ブランド(メーカー)
         <span class="field-with-action">
           <select id="field-brand"><option value="">未設定</option></select>
           <button type="button" id="manage-brands-btn" class="btn btn-sm">管理</button>
         </span>
       </label>
-      <label>カテゴリ
+      <label>カテゴリ（分類）
         <span class="field-with-action">
           <select id="field-category"><option value="">未分類</option></select>
-          <button type="button" id="manage-categories-btn" class="btn btn-sm">管理</button>
+          <button type="button" id="manage-categories-btn" class="btn btn-sm">カテゴリ管理</button>
         </span>
       </label>
+      <details id="product-specs-details" class="product-specs-section">
+        <summary>PC・機器スペック（任意）</summary>
+        <div class="product-specs-grid">
+          <label>型番
+            <input id="field-spec-model" type="text" placeholder="例: MacBookAir10,1" />
+          </label>
+          <label>CPU
+            <input id="field-spec-cpu" type="text" placeholder="例: Apple M1 / Core i5" />
+          </label>
+          <label>メモリ
+            <input id="field-spec-memory" type="text" placeholder="例: 16GB" />
+          </label>
+          <label>GPU
+            <input id="field-spec-gpu" type="text" />
+          </label>
+          <label>HDD / SSD区分
+            <select id="field-spec-storage-type">
+              <option value="">未設定</option>
+              <option value="SSD">SSD</option>
+              <option value="HDD">HDD</option>
+              <option value="SSD+HDD">SSD + HDD</option>
+              <option value="eMMC">eMMC</option>
+              <option value="その他">その他</option>
+            </select>
+          </label>
+          <label>ストレージ容量
+            <input id="field-spec-storage-capacity" type="text" placeholder="例: 512GB" />
+          </label>
+          <label>OS
+            <input id="field-spec-os" type="text" placeholder="例: Windows 11 Pro" />
+          </label>
+          <label>モニターサイズ
+            <input id="field-spec-monitor-size" type="text" placeholder="例: 27インチ" />
+          </label>
+          <label>モニター解像度
+            <input id="field-spec-monitor-resolution" type="text" placeholder="例: 2560×1440" />
+          </label>
+          <label>モニター接続端子
+            <input id="field-spec-monitor-connectors" type="text" placeholder="例: HDMI×2 / DisplayPort" />
+          </label>
+          <label>ネットワーク
+            <input id="field-spec-network" type="text" placeholder="例: Wi-Fi 6 / 有線LAN" />
+          </label>
+          <label>付属品
+            <input id="field-spec-accessories" type="text" placeholder="例: ACアダプター" />
+          </label>
+        </div>
+        <label>インストール済みソフト
+          <textarea id="field-spec-software" rows="2" placeholder="例: Microsoft Office 2024"></textarea>
+        </label>
+        <label>その他仕様
+          <textarea id="field-spec-other" rows="2"></textarea>
+        </label>
+      </details>
       <div class="field-row">
         <label>数量
           <input id="field-quantity" type="number" min="0" step="1" value="1" required />
@@ -313,6 +420,18 @@
       <label id="movement-qty-label">数量
         <input id="movement-quantity" type="number" min="1" step="1" value="1" required />
       </label>
+      <section id="movement-expiry-section" class="product-expiry-section">
+        <h3>賞味期限管理（任意）</h3>
+        <p>両方入力すると、入庫数量を賞味期限一覧へ登録します。</p>
+        <div class="field-row">
+          <label>賞味期限
+            <input id="movement-expiry-date" type="date" />
+          </label>
+          <label>置き場所
+            <input id="movement-expiry-location" type="text" placeholder="例: 1番棚 上段" />
+          </label>
+        </div>
+      </section>
       <label>メモ
         <input id="movement-note" type="text" placeholder="任意" />
       </label>
@@ -326,6 +445,16 @@
     </form>
   </dialog>
 
+  <dialog id="inventory-detail-dialog">
+    <div class="scan-body">
+      <h2>棚別在庫詳細</h2>
+      <div id="inventory-detail-content"></div>
+      <div class="dialog-actions-right">
+        <button type="button" id="close-inventory-detail-btn" class="btn">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- バーコードスキャンモーダル -->
   <dialog id="scan-dialog">
     <div class="scan-body">
@@ -337,6 +466,56 @@
           <button type="button" id="cancel-scan-btn" class="btn">閉じる</button>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <!-- 品出し・賞味期限登録モーダル -->
+  <dialog id="expiry-item-dialog">
+    <form id="expiry-item-form" method="dialog">
+      <h2>品出しを登録</h2>
+      <input type="hidden" id="expiry-item-id" />
+      <label>バーコード <span class="required">*</span>
+        <span class="field-with-action">
+          <input id="expiry-field-barcode" type="text" inputmode="numeric" autocomplete="off" required />
+          <button type="button" id="expiry-scan-btn" class="btn btn-sm">📷 読取</button>
+        </span>
+      </label>
+      <p id="expiry-lookup-status" class="field-help"></p>
+      <label>商品名 <span class="required">*</span>
+        <input id="expiry-field-product-name" type="text" required />
+      </label>
+      <div class="field-row">
+        <label>賞味期限 <span class="required">*</span>
+          <input id="expiry-field-date" type="date" required />
+        </label>
+        <label>数量
+          <input id="expiry-field-quantity" type="number" min="1" step="1" value="1" required />
+        </label>
+      </div>
+      <label>置き場所 <span class="required">*</span>
+        <input id="expiry-field-location" type="text" placeholder="例: 1番棚 上段" required />
+      </label>
+      <label>メモ
+        <input id="expiry-field-notes" type="text" />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="delete-expiry-item-btn" class="btn btn-danger" hidden>削除</button>
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-expiry-item-btn" class="btn">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="expiry-scan-dialog">
+    <div class="scan-body">
+      <h2>品出し商品のバーコード</h2>
+      <video id="expiry-scan-video" muted playsinline></video>
+      <p id="expiry-scan-status" class="scan-status">カメラを起動しています…</p>
+      <div class="dialog-actions"><div class="dialog-actions-right">
+        <button type="button" id="cancel-expiry-scan-btn" class="btn">閉じる</button>
+      </div></div>
     </div>
   </dialog>
 
@@ -507,14 +686,16 @@
   <!-- 請求書印刷プレビュー -->
   <div id="invoice-print-view" class="print-overlay" hidden></div>
   <div id="report-print-view" class="print-overlay" hidden></div>
+  <div id="shelf-inventory-print-view" class="print-overlay" hidden></div>
 
   <div id="toast" class="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <script src="https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js"></script>
   <script src="config.js?v=20260727b"></script>
-  <script src="common.js?v=20260727b"></script>
-  <script src="app.js?v=20260727b"></script>
+  <script src="common.js?v=20260802l"></script>
+  <script src="app.js?v=20260802r"></script>
+  <script src="expiry.js?v=20260802p"></script>
   <script src="customers.js?v=20260727b"></script>
   <script src="invoices.js?v=20260727b"></script>
   <script src="reports.js?v=20260727b"></script>

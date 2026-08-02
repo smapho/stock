@@ -14,11 +14,33 @@ const fieldPrice = document.getElementById("field-price");
 const fieldPriceIncludesTax = document.getElementById("field-price-includes-tax");
 const fieldTaxRate = document.getElementById("field-tax-rate");
 const fieldPricePreview = document.getElementById("field-price-preview");
+const fieldExpiryDate = document.getElementById("field-expiry-date");
+const fieldExpiryLocation = document.getElementById("field-expiry-location");
+const productSpecsDetails = document.getElementById("product-specs-details");
+const productSpecFieldIds = {
+  model: "field-spec-model",
+  cpu: "field-spec-cpu",
+  memory: "field-spec-memory",
+  gpu: "field-spec-gpu",
+  storageType: "field-spec-storage-type",
+  storageCapacity: "field-spec-storage-capacity",
+  os: "field-spec-os",
+  software: "field-spec-software",
+  monitorSize: "field-spec-monitor-size",
+  monitorResolution: "field-spec-monitor-resolution",
+  monitorConnectors: "field-spec-monitor-connectors",
+  network: "field-spec-network",
+  accessories: "field-spec-accessories",
+  other: "field-spec-other",
+};
 
 const movementDialog = document.getElementById("movement-dialog");
 const movementForm = document.getElementById("movement-form");
 const movementType = document.getElementById("movement-type");
 const movementQtyLabel = document.getElementById("movement-qty-label");
+const movementExpirySection = document.getElementById("movement-expiry-section");
+const movementExpiryDate = document.getElementById("movement-expiry-date");
+const movementExpiryLocation = document.getElementById("movement-expiry-location");
 
 const categoryDialog = document.getElementById("category-dialog");
 const manageCategoriesBtn = document.getElementById("manage-categories-btn");
@@ -245,7 +267,7 @@ function renderProducts() {
     if (!term) return true;
     return (
       p.name.toLowerCase().includes(term) ||
-      (p.sku || "").toLowerCase().includes(term)
+      (p.barcode || "").toLowerCase().includes(term)
     );
   });
 
@@ -269,10 +291,10 @@ function renderProducts() {
       return `
         <tr class="${isLow ? "low-stock" : ""}" data-id="${p.id}">
           <td>${escapeHtml(p.name)}</td>
-          <td>${escapeHtml(p.sku || "-")}</td>
+          <td>${escapeHtml(p.barcode || "-")}</td>
           <td>${escapeHtml(brandName)}</td>
           <td>${escapeHtml(categoryName)}</td>
-          <td><span class="qty-badge ${isLow ? "low" : ""}">${p.quantity} ${escapeHtml(p.unit || "")}</span></td>
+          <td><button type="button" class="qty-badge inventory-detail-btn ${isLow ? "low" : ""}" data-id="${p.id}" title="棚別在庫の詳細を表示">${p.quantity} ${escapeHtml(p.unit || "")}</button></td>
           <td>${formatPriceCell(p)}</td>
           <td>${escapeHtml(p.purchased_at || "-")}</td>
           <td>
@@ -285,6 +307,7 @@ function renderProducts() {
       `;
     })
     .join("");
+  if (typeof refreshInventoryDetailButtons === "function") refreshInventoryDetailButtons();
 }
 
 async function loadProducts() {
@@ -319,6 +342,26 @@ function updatePricePreview() {
   el.addEventListener("input", updatePricePreview)
 );
 
+function readProductSpecs() {
+  return Object.fromEntries(Object.entries(productSpecFieldIds)
+    .map(([key, id]) => [key, document.getElementById(id).value.trim()])
+    .filter(([, value]) => value));
+}
+
+function setProductSpecs(specs = {}) {
+  Object.entries(productSpecFieldIds).forEach(([key, id]) => {
+    document.getElementById(id).value = specs?.[key] || "";
+  });
+  productSpecsDetails.open = productSpecEntries(specs).length > 0;
+}
+
+function openSpecsForEquipmentCategory() {
+  const categoryName = categories.find((category) => category.id === fieldCategory.value)?.name || "";
+  if (/^(PC|OA機器)$/i.test(categoryName)) productSpecsDetails.open = true;
+}
+
+fieldCategory.addEventListener("change", openSpecsForEquipmentCategory);
+
 function openProductDialog(product = null) {
   productForm.reset();
   document.getElementById("field-unit").value = "個";
@@ -326,14 +369,16 @@ function openProductDialog(product = null) {
   document.getElementById("field-low-threshold").value = 0;
   fieldPriceIncludesTax.value = "false";
   fieldTaxRate.value = "0.10";
+  setProductSpecs(product?.specs || {});
 
   if (product) {
     productDialogTitle.textContent = "商品を編集";
     document.getElementById("product-id").value = product.id;
     document.getElementById("field-name").value = product.name;
-    document.getElementById("field-sku").value = product.sku || "";
+    document.getElementById("field-barcode").value = product.barcode || "";
     fieldBrand.value = product.brand_id || "";
     fieldCategory.value = product.category_id || "";
+    openSpecsForEquipmentCategory();
     document.getElementById("field-quantity").value = product.quantity;
     document.getElementById("field-unit").value = product.unit || "個";
     document.getElementById("field-low-threshold").value = product.low_stock_threshold;
@@ -360,9 +405,12 @@ document.getElementById("cancel-dialog-btn").addEventListener("click", () => pro
 productForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("product-id").value;
+  const expiryDate = fieldExpiryDate.value;
+  const expiryLocation = fieldExpiryLocation.value.trim();
+  const shouldRegisterExpiry = !!(expiryDate || expiryLocation);
   const payload = {
     name: document.getElementById("field-name").value.trim(),
-    sku: document.getElementById("field-sku").value.trim() || null,
+    barcode: normalizeBarcode(document.getElementById("field-barcode").value) || null,
     brand_id: fieldBrand.value || null,
     category_id: fieldCategory.value || null,
     quantity: Number(document.getElementById("field-quantity").value) || 0,
@@ -373,10 +421,31 @@ productForm.addEventListener("submit", async (e) => {
     tax_rate: Number(fieldTaxRate.value),
     purchased_at: document.getElementById("field-purchased-at").value || null,
     notes: document.getElementById("field-notes").value.trim() || null,
+    specs: readProductSpecs(),
   };
 
   if (!payload.name) {
     showToast("商品名を入力してください", true);
+    return;
+  }
+  if (payload.barcode && !isValidGtin(payload.barcode)) {
+    showToast("JANには正しい8・12・13・14桁のバーコード番号を入力してください", true);
+    document.getElementById("field-barcode").focus();
+    return;
+  }
+  if (shouldRegisterExpiry && (!expiryDate || !expiryLocation)) {
+    showToast("賞味期限を登録する場合は、賞味期限と置き場所の両方を入力してください", true);
+    (!expiryDate ? fieldExpiryDate : fieldExpiryLocation).focus();
+    return;
+  }
+  if (shouldRegisterExpiry && !payload.barcode) {
+    showToast("賞味期限を登録する場合はJANを入力してください", true);
+    document.getElementById("field-barcode").focus();
+    return;
+  }
+  if (shouldRegisterExpiry && payload.quantity < 1) {
+    showToast("賞味期限を登録する場合は数量を1以上にしてください", true);
+    document.getElementById("field-quantity").focus();
     return;
   }
 
@@ -386,10 +455,28 @@ productForm.addEventListener("submit", async (e) => {
 
   const { error } = await query;
   if (error) {
-    showToast(`保存エラー: ${error.message}`, true);
+    showToast(error.code === "23505" ? "このJANコードは別の商品に登録済みです" : `保存エラー: ${error.message}`, true);
     return;
   }
-  showToast("保存しました");
+
+  if (shouldRegisterExpiry) {
+    const { error: expiryError } = await supabaseClient.from("expiry_items").insert({
+      barcode: payload.barcode,
+      product_name: payload.name,
+      expires_on: expiryDate,
+      location: expiryLocation,
+      quantity: payload.quantity,
+      notes: null,
+    });
+    if (expiryError) {
+      showToast(`商品は保存しましたが、賞味期限を登録できませんでした: ${expiryError.message}`, true);
+      productDialog.close();
+      await loadProducts();
+      return;
+    }
+  }
+
+  showToast(shouldRegisterExpiry ? "商品と賞味期限を保存しました" : "保存しました");
   productDialog.close();
   await loadProducts();
 });
@@ -416,10 +503,12 @@ let movementProduct = null;
 function openMovementDialog(product) {
   movementProduct = product;
   movementForm.reset();
-  document.getElementById("movement-product-name").textContent = `${product.name}(現在庫: ${product.quantity} ${product.unit || ""})`;
+  const codes = product.barcode ? `JAN: ${product.barcode}` : "";
+  document.getElementById("movement-product-name").textContent = `${product.name}${codes ? `（${codes}）` : ""}（現在庫: ${product.quantity} ${product.unit || ""}）`;
   movementType.value = "in";
   document.getElementById("movement-quantity").value = 1;
   updateMovementQtyLabel();
+  updateMovementExpiryVisibility();
   movementDialog.showModal();
 }
 
@@ -427,7 +516,20 @@ function updateMovementQtyLabel() {
   movementQtyLabel.firstChild.textContent =
     movementType.value === "adjust" ? "調整後の数量" : "数量";
 }
-movementType.addEventListener("change", updateMovementQtyLabel);
+
+function updateMovementExpiryVisibility() {
+  const isInbound = movementType.value === "in";
+  movementExpirySection.hidden = !isInbound;
+  if (!isInbound) {
+    movementExpiryDate.value = "";
+    movementExpiryLocation.value = "";
+  }
+}
+
+movementType.addEventListener("change", () => {
+  updateMovementQtyLabel();
+  updateMovementExpiryVisibility();
+});
 
 document.getElementById("cancel-movement-btn").addEventListener("click", () => movementDialog.close());
 
@@ -437,9 +539,26 @@ movementForm.addEventListener("submit", async (e) => {
   const type = movementType.value;
   const qtyInput = Number(document.getElementById("movement-quantity").value);
   const note = document.getElementById("movement-note").value.trim() || null;
+  const expiryDate = movementExpiryDate.value;
+  const expiryLocation = movementExpiryLocation.value.trim();
+  const shouldRegisterExpiry = type === "in" && !!(expiryDate || expiryLocation);
 
   if (!Number.isFinite(qtyInput) || qtyInput < 0) {
     showToast("数量を正しく入力してください", true);
+    return;
+  }
+  if (shouldRegisterExpiry && (!expiryDate || !expiryLocation)) {
+    showToast("賞味期限を登録する場合は、賞味期限と置き場所の両方を入力してください", true);
+    (!expiryDate ? movementExpiryDate : movementExpiryLocation).focus();
+    return;
+  }
+  if (shouldRegisterExpiry && !movementProduct.barcode) {
+    showToast("賞味期限を登録するには商品へJANを登録してください", true);
+    return;
+  }
+  if (shouldRegisterExpiry && qtyInput < 1) {
+    showToast("賞味期限を登録する場合は入庫数量を1以上にしてください", true);
+    document.getElementById("movement-quantity").focus();
     return;
   }
 
@@ -482,7 +601,24 @@ movementForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  showToast("在庫を更新しました");
+  if (shouldRegisterExpiry) {
+    const { error: expiryError } = await supabaseClient.from("expiry_items").insert({
+      barcode: movementProduct.barcode,
+      product_name: movementProduct.name,
+      expires_on: expiryDate,
+      location: expiryLocation,
+      quantity: qtyInput,
+      notes: note,
+    });
+    if (expiryError) {
+      showToast(`在庫は更新しましたが、賞味期限を登録できませんでした: ${expiryError.message}`, true);
+      movementDialog.close();
+      await loadProducts();
+      return;
+    }
+  }
+
+  showToast(shouldRegisterExpiry ? "入庫と賞味期限を登録しました" : "在庫を更新しました");
   movementDialog.close();
   await loadProducts();
 });
@@ -523,8 +659,10 @@ const scanBarcodeBtn = document.getElementById("scan-barcode-btn");
 const cancelScanBtn = document.getElementById("cancel-scan-btn");
 
 let scanControls = null;
+let scanHintTimer = null;
 
 function stopScan() {
+  clearTimeout(scanHintTimer);
   if (scanControls) {
     scanControls.stop();
     scanControls = null;
@@ -532,17 +670,36 @@ function stopScan() {
 }
 
 async function handleScannedCode(code) {
+  if (!isValidGtin(code)) {
+    scanStatus.textContent = "QRコードは対象外です。数字のバーコードを枠内に入れてください";
+    return;
+  }
+
   stopScan();
   scanDialog.close();
 
-  const product = products.find((p) => (p.sku || "").trim() === code.trim());
+  const normalizedCode = normalizeBarcode(code);
+  const product = products.find((p) => normalizeBarcode(p.barcode) === normalizedCode);
   if (product) {
     showToast(`スキャン: ${product.name}`);
     openMovementDialog(product);
   } else {
-    showToast("未登録のバーコードです。商品名を入力してください", true);
     openProductDialog();
-    document.getElementById("field-sku").value = code;
+    document.getElementById("field-barcode").value = normalizedCode;
+    showToast("商品名を検索しています…");
+    try {
+      const result = await findProductByBarcode(normalizedCode, products);
+      if (result.name) {
+        document.getElementById("field-name").value = result.name;
+        showToast(`商品名を取得しました: ${result.name}`);
+      } else {
+        showToast("商品名が見つかりません。手入力してください", true);
+        document.getElementById("field-name").focus();
+      }
+    } catch (error) {
+      showToast("商品名を取得できませんでした。手入力してください", true);
+      document.getElementById("field-name").focus();
+    }
   }
 }
 
@@ -569,6 +726,9 @@ async function startScan() {
         }
       }
     );
+    scanHintTimer = setTimeout(() => {
+      scanStatus.textContent = "読み取り中… バーコード全体を枠内に入れ、少し離して合わせてください";
+    }, 6000);
   } catch (err) {
     scanStatus.textContent = `カメラを起動できませんでした: ${err.message}`;
   }

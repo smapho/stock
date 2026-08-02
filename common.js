@@ -80,6 +80,73 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const PRODUCT_SPEC_LABELS = {
+  model: "型番",
+  cpu: "CPU",
+  memory: "メモリ",
+  gpu: "GPU",
+  storageType: "ストレージ区分",
+  storageCapacity: "ストレージ容量",
+  os: "OS",
+  software: "ソフト",
+  monitorSize: "モニターサイズ",
+  monitorResolution: "モニター解像度",
+  monitorConnectors: "接続端子",
+  network: "ネットワーク",
+  accessories: "付属品",
+  other: "その他",
+};
+
+function productSpecEntries(specs) {
+  const source = specs && typeof specs === "object" ? specs : {};
+  return Object.entries(PRODUCT_SPEC_LABELS)
+    .map(([key, label]) => ({ key, label, value: String(source[key] || "").trim() }))
+    .filter((entry) => entry.value);
+}
+
+function formatProductSpecs(specs) {
+  return productSpecEntries(specs).map((entry) => `${entry.label}: ${entry.value}`).join(" / ");
+}
+
+// --- バーコード商品名検索 ---
+function normalizeBarcode(value) {
+  const withoutPrefix = String(value || "").trim().replace(/^sku\s*:\s*/i, "");
+  return /^[\d\s-]+$/.test(withoutPrefix)
+    ? withoutPrefix.replace(/[^\d]/g, "")
+    : withoutPrefix;
+}
+
+// JAN/EAN/UPC/GTIN の数字とチェックデジットを確認する。
+// MultiFormatReader は商品上のQRコードも読むため、URLなどをJANとして扱わない。
+function isValidGtin(value) {
+  const code = normalizeBarcode(value);
+  if (!/^\d+$/.test(code) || ![8, 12, 13, 14].includes(code.length)) return false;
+
+  const checkDigit = Number(code.at(-1));
+  const body = code.slice(0, -1);
+  let sum = 0;
+  for (let index = body.length - 1, position = 1; index >= 0; index -= 1, position += 1) {
+    sum += Number(body[index]) * (position % 2 === 1 ? 3 : 1);
+  }
+  return (10 - (sum % 10)) % 10 === checkDigit;
+}
+
+async function findProductByBarcode(value, existingProducts = []) {
+  const code = normalizeBarcode(value);
+  if (!code) return { code, name: null, source: null };
+
+  const localProduct = existingProducts.find((product) => normalizeBarcode(product.barcode) === code);
+  if (localProduct) return { code, name: localProduct.name, source: "local", product: localProduct };
+
+  const response = await fetch(
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_ja`
+  );
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const result = await response.json();
+  const name = result.product?.product_name_ja || result.product?.product_name || null;
+  return { code, name: result.status === 1 ? name : null, source: name ? "openfoodfacts" : null };
+}
+
 // --- タブ切り替え ---
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
